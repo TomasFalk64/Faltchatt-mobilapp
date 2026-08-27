@@ -119,15 +119,21 @@ export function SettingsScreen({
             </Pressable>
           </View>
         ) : null}
-        <Text style={styles.label}>Alias:</Text>
-        <TextInput placeholder="Alias" style={styles.input} value={alias} onChangeText={setAlias} />
+        <View style={styles.inputRow}>
+          <Text style={styles.label}>Alias:</Text>
+          <TextInput placeholder="Alias" style={[styles.input, styles.inputRowField]} value={alias} onChangeText={setAlias} />
+        </View>
         <Text style={styles.label}>Symbol</Text>
         <View style={styles.chipWrap}>
-          {SYMBOLS.map((item) => (
-            <Pressable key={item.id} style={[styles.symbolChoice, symbol === item.id && styles.symbolChoiceActive]} onPress={() => setSymbol(item.id)}>
-              <FaltSymbol color={color} size={28} symbol={item.id} />
-            </Pressable>
-          ))}
+          {SYMBOLS.map((item) => {
+            const pickerSize = item.id === 'train' ? 38 : item.id === 'hat' ? 25 : 38;
+            const pickerOffset = item.id === 'train' ? -3 : item.id === 'hat' ? 1 : 0;
+            return (
+              <Pressable key={item.id} style={[styles.symbolChoice, symbol === item.id && styles.symbolChoiceActive]} onPress={() => setSymbol(item.id)}>
+                <FaltSymbol color="#111827" size={pickerSize} style={pickerOffset ? { transform: [{ translateY: pickerOffset }] } : undefined} symbol={item.id} />
+              </Pressable>
+            );
+          })}
         </View>
         <Text style={styles.label}>Symbolfärg</Text>
         <View style={styles.colorWrap}>

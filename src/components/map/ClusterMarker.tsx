@@ -3,6 +3,7 @@ import { Callout, Marker } from 'react-native-maps';
 
 import { FaltSymbol } from '@/components/common/FaltSymbol';
 import { formatRelative } from '@/lib/format';
+import { CLUSTER_MARKER_IMAGE } from '@/lib/mapMarkerImages';
 import { LocationRow, Member, Profile } from '@/lib/types';
 import { styles } from '@/styles/faltchattStyles';
 
@@ -20,10 +21,7 @@ export function ClusterMarker({
   const center = averageLocation(group);
 
   return (
-    <Marker coordinate={{ latitude: center.latitude, longitude: center.longitude }} title="Flera personer här">
-      <View style={styles.mapClusterMarker}>
-        <Text style={styles.mapClusterText}>∞</Text>
-      </View>
+    <Marker anchor={{ x: 0.5, y: 0.5 }} centerOffset={{ x: 0, y: 0 }} coordinate={{ latitude: center.latitude, longitude: center.longitude }} image={CLUSTER_MARKER_IMAGE} title="Flera personer här">
       <Callout>
         <View style={styles.clusterCallout}>
           <Text style={styles.calloutTitle}>Flera personer här</Text>
