@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { confirmAction } from '@/components/common/confirmAction';
+import { FaltSymbol } from '@/components/common/FaltSymbol';
 import { Section } from '@/components/common/Section';
-import { SYMBOL_COLORS, SYMBOLS, symbolLabel } from '@/constants/faltchatt';
+import { SYMBOL_COLORS, SYMBOLS } from '@/constants/faltchatt';
 import { friendlyError } from '@/lib/format';
 import { Profile } from '@/lib/types';
 import { deleteAccount, saveProfile, signOut, updatePassword } from '@/services/authService';
@@ -107,7 +108,7 @@ export function SettingsScreen({
 
   return (
     <View style={styles.stack}>
-      <Section title="Profil">
+      <Section>
         {passwordRecovery ? (
           <View style={styles.infoBox}>
             <Text style={styles.infoTitle}>Välj nytt lösenord</Text>
@@ -118,13 +119,13 @@ export function SettingsScreen({
             </Pressable>
           </View>
         ) : null}
+        <Text style={styles.label}>Alias:</Text>
         <TextInput placeholder="Alias" style={styles.input} value={alias} onChangeText={setAlias} />
         <Text style={styles.label}>Symbol</Text>
         <View style={styles.chipWrap}>
           {SYMBOLS.map((item) => (
             <Pressable key={item.id} style={[styles.symbolChoice, symbol === item.id && styles.symbolChoiceActive]} onPress={() => setSymbol(item.id)}>
-              <Text style={[styles.symbol, { color }]}>{item.glyph}</Text>
-              <Text style={styles.muted}>{symbolLabel(item.id)}</Text>
+              <FaltSymbol color={color} size={28} symbol={item.id} />
             </Pressable>
           ))}
         </View>
@@ -150,7 +151,6 @@ export function SettingsScreen({
           <Text style={styles.dangerButtonText}>Ta bort mitt konto</Text>
         </Pressable>
       </Section>
-      <PrivacySection />
     </View>
   );
 }
@@ -161,7 +161,7 @@ export function PrivacySection() {
       <Text style={styles.paragraph}>Fältchatt är en enkel gruppapp för fältarbete där medlemmar kan dela chatt och position inom vald grupp.</Text>
       <Text style={styles.paragraph}>Appen lagrar alias, vald symbol, symbolfärg, gruppmedlemskap, chatt, polls och platsdata som du själv delar.</Text>
       <Text style={styles.paragraph}>E-post används bara av Supabase Auth för inloggning, bekräftelse, lösenordsåterställning och eventuell kontovarning. Vanliga app-tabeller lagrar inte e-postadresser.</Text>
-      <Text style={styles.paragraph}>Positionsdelning styrs i Profil/Grupp och använder bara foreground-position i denna mobilversion.</Text>
+      <Text style={styles.paragraph}>Positionsdelning styrs i Profil och använder bara foreground-position i denna mobilversion.</Text>
       <Text style={styles.paragraph}>Grupper är tillfälliga och raderas automatiskt efter 7 dagar. Max 30 personer kan vara approved eller pending i samma grupp.</Text>
     </Section>
   );

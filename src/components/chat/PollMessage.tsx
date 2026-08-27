@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { symbolGlyph } from '@/constants/faltchatt';
+import { FaltSymbol } from '@/components/common/FaltSymbol';
 import { formatRelative, friendlyError } from '@/lib/format';
 import { Member, Message, Question, QuestionAnswer } from '@/lib/types';
 import { answerQuestion } from '@/services/pollService';
@@ -39,9 +39,10 @@ export function PollMessage({
 
   return (
     <View style={styles.question}>
-      <Text style={styles.messageMeta}>
-        {symbolGlyph(member?.profiles?.symbol)} {member?.profiles?.alias ?? 'Okänd'} · {formatRelative(message.created_at)}
-      </Text>
+      <View style={styles.messageMetaRow}>
+        <FaltSymbol color={member?.profiles?.symbol_color} size={14} symbol={member?.profiles?.symbol} />
+        <Text style={styles.messageMeta}>{member?.profiles?.alias ?? 'Okänd'} · {formatRelative(message.created_at)}</Text>
+      </View>
       <Text style={styles.questionTitle}>{question.question_text}</Text>
       {(question.question_options ?? [])
         .slice()

@@ -41,7 +41,6 @@ export function ChatScreen({
     <View style={styles.stack}>
       <MessageList
         answers={answers}
-        groupName={activeGroup.name}
         membersByUser={membersByUser}
         messages={messages}
         onRefresh={onRefresh}

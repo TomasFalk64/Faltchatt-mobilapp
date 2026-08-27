@@ -1,10 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
+import { useRef } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { LoadingState } from '@/components/common/LoadingState';
 import { StatusBanner } from '@/components/common/StatusBanner';
+import { TopBar } from '@/components/common/TopBar';
 import { useFaltchattApp } from '@/hooks/useFaltchattApp';
 import { ViewKey } from '@/lib/appTypes';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -18,6 +20,7 @@ import { styles } from '@/styles/faltchattStyles';
 
 export default function FaltchattApp() {
   const { state, actions } = useFaltchattApp();
+  const contentRef = useRef<ScrollView>(null);
 
   if (!isSupabaseConfigured) {
     return <ErrorMessage text="Supabase saknar konfiguration. Lägg EXPO_PUBLIC_SUPABASE_URL och EXPO_PUBLIC_SUPABASE_ANON_KEY i .env.local." />;
@@ -33,28 +36,38 @@ export default function FaltchattApp() {
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {state.user ? (
           <>
-            <MapScreen
-              activeGroup={state.activeGroup}
-              approved={state.approved}
-              locations={state.visibleLocations}
-              locationMessages={state.locationMessages}
-              mapRef={state.mapRef}
-              membersByUser={state.membersByUser}
-              onOpenMessage={(message) => actions.setMapTarget({ latitude: message.latitude!, longitude: message.longitude!, text: message.text })}
-              userId={state.user.id}
+            <TopBar
+              alias={state.profile?.alias ?? state.user.email ?? 'Profil'}
+              groupName={state.activeGroup?.name ?? 'Ingen grupp vald'}
+              onOpenProfile={() => actions.setView('profile')}
+              setNotice={actions.setNotice}
             />
-            <View style={styles.noticeArea}>
-              {state.notice ? <StatusBanner text={state.notice} onClose={actions.clearNotice} /> : null}
-              {state.groupNotice ? <StatusBanner text={state.groupNotice} tone="success" onClose={actions.clearGroupNotice} /> : null}
+            <View style={styles.mapWithNotice}>
+              <MapScreen
+                approved={state.approved}
+                locations={state.visibleLocations}
+                locationMessages={state.locationMessages}
+                mapRef={state.mapRef}
+                membersByUser={state.membersByUser}
+                onOpenMessage={(message) => actions.setMapTarget({ latitude: message.latitude!, longitude: message.longitude!, text: message.text })}
+                ownLocation={state.ownLocation}
+                profile={state.profile}
+                userId={state.user.id}
+              />
+              {state.notice || state.groupNotice ? (
+                <View style={styles.noticeOverlay}>
+                  {state.notice ? <StatusBanner text={state.notice} onClose={actions.clearNotice} /> : null}
+                  {state.groupNotice ? <StatusBanner text={state.groupNotice} tone="success" onClose={actions.clearGroupNotice} /> : null}
+                </View>
+              ) : null}
             </View>
             <TabBar
-              canAdmin={state.canAdmin}
               unreadChat={state.unreadChat}
               unreadGroup={state.unreadGroup}
               value={state.view}
               onChange={actions.setView}
             />
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled">
+            <ScrollView ref={contentRef} style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled">
               {state.view === 'group' ? (
                 <GroupScreen
                   activeGroup={state.activeGroup}
@@ -63,18 +76,14 @@ export default function FaltchattApp() {
                   busy={state.busy}
                   canAdmin={state.canAdmin}
                   canOwn={state.canOwn}
-                  locationSharingEnabled={state.locationSharingEnabled}
                   members={state.members}
                   memberships={state.memberships}
                   onRefresh={() => actions.refreshAll(state.activeGroupId)}
+                  onScrollToTop={() => contentRef.current?.scrollTo({ y: 0, animated: true })}
                   onSelectGroup={actions.selectGroup}
-                  onSetSharing={actions.setLocationSharingEnabled}
                   presence={state.presence}
-                  profile={state.profile}
-                  role={state.role}
                   setBusy={actions.setBusy}
                   setNotice={actions.setNotice}
-                  userEmail={state.user.email}
                   userId={state.user.id}
                 />
               ) : null}
@@ -132,13 +141,11 @@ export default function FaltchattApp() {
 }
 
 function TabBar({
-  canAdmin,
   onChange,
   unreadChat,
   unreadGroup,
   value,
 }: {
-  canAdmin: boolean;
   onChange: (value: ViewKey) => void;
   unreadChat: boolean;
   unreadGroup: boolean;
@@ -148,7 +155,7 @@ function TabBar({
     { key: 'group', label: 'Grupp', dot: unreadGroup },
     { key: 'chat', label: 'Chatt', dot: unreadChat },
     { key: 'profile', label: 'Profil' },
-    { key: 'admin', label: 'Admin', visible: canAdmin },
+    { key: 'admin', label: 'Adm', visible: true },
   ];
 
   return (

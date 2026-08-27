@@ -39,11 +39,6 @@ export async function updatePassword(password: string) {
 
 export async function ensureProfile(user: User): Promise<Profile> {
   const client = requireSupabase();
-  try {
-    await client.rpc('ensure_own_profile');
-  } catch {
-    // Older databases may rely on direct profile insert below.
-  }
   const { data, error } = await client
     .from('profiles')
     .select('id, alias, symbol, symbol_color, updated_at')
@@ -51,6 +46,17 @@ export async function ensureProfile(user: User): Promise<Profile> {
     .maybeSingle();
   if (error) throw error;
   if (data) return data as Profile;
+
+  const { error: ensureError } = await client.rpc('ensure_own_profile');
+  if (!ensureError) {
+    const { data: ensured, error: ensuredError } = await client
+      .from('profiles')
+      .select('id, alias, symbol, symbol_color, updated_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (ensuredError) throw ensuredError;
+    if (ensured) return ensured as Profile;
+  }
 
   const { data: created, error: createError } = await client
     .from('profiles')
@@ -62,7 +68,15 @@ export async function ensureProfile(user: User): Promise<Profile> {
     })
     .select('id, alias, symbol, symbol_color, updated_at')
     .single();
-  if (createError) throw createError;
+  if (createError) {
+    console.warn('Kunde inte skapa profilrad.', ensureError ?? createError);
+    return {
+      id: user.id,
+      alias: 'Fältanvändare',
+      symbol: SYMBOLS[0].id,
+      symbol_color: SYMBOL_COLORS[0],
+    };
+  }
   return created as Profile;
 }
 

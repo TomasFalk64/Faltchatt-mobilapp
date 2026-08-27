@@ -20,7 +20,7 @@ export function AuthScreen({ setNotice }: { setNotice: (text: string) => void })
       if (result.error) throw result.error;
       setNotice(mode === 'signup' ? 'Kontot är skapat. Bekräfta e-post om Supabase kräver det.' : 'Du är inloggad.');
     } catch (error) {
-      setNotice(friendlyError(error, mode === 'signup' ? 'Kunde inte skapa konto.' : 'Inloggningen misslyckades.'));
+      setNotice(friendlyError(error, mode === 'signup' ? 'Kunde inte skapa konto.' : 'Okänd användare eller fel lösenord.'));
     } finally {
       setBusy(false);
     }

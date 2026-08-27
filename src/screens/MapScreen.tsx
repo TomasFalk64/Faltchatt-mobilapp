@@ -1,8 +1,11 @@
-import { Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 
+import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { MemberMarker } from '@/components/map/MemberMarker';
-import { Group, LocationRow, Member, Message } from '@/lib/types';
+import { distanceMeters } from '@/lib/format';
+import { LocationRow, Member, Message, Profile } from '@/lib/types';
 import { styles } from '@/styles/faltchattStyles';
 
 const DEFAULT_REGION: Region = {
@@ -13,37 +16,52 @@ const DEFAULT_REGION: Region = {
 };
 
 export function MapScreen({
-  activeGroup,
   approved,
   locations,
   locationMessages,
   mapRef,
   membersByUser,
   onOpenMessage,
+  ownLocation,
+  profile,
   userId,
 }: {
-  activeGroup: Group | null;
   approved: boolean;
   locations: LocationRow[];
   locationMessages: Message[];
   mapRef: React.RefObject<MapView | null>;
   membersByUser: Map<string, Member>;
   onOpenMessage: (message: Message) => void;
+  ownLocation: LocationRow | null;
+  profile: Profile | null;
   userId: string;
 }) {
+  const [region, setRegion] = useState(DEFAULT_REGION);
+  const groupedLocations = useMemo(() => {
+    const visibleLocations = ownLocation && !locations.some((location) => location.user_id === userId) ? [...locations, ownLocation] : locations;
+    return groupNearbyLocations(visibleLocations, region);
+  }, [locations, ownLocation, region, userId]);
+
   return (
     <View style={styles.mapWrap}>
-      <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION} showsUserLocation={false}>
-        {approved
-          ? locations.map((location) => (
+      <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION} showsUserLocation={false} onRegionChangeComplete={setRegion}>
+        {groupedLocations.map((group) => {
+          if (group.length > 5) {
+            return <ClusterMarker key={group.map((location) => location.user_id).sort().join('|')} group={group} membersByUser={membersByUser} ownProfile={profile} userId={userId} />;
+          }
+          return memberOffsets(group.length, region).map((offset, index) => {
+            const location = group[index];
+            return (
               <MemberMarker
                 key={`${location.group_id}:${location.user_id}`}
-                location={location}
+                location={{ ...location, latitude: location.latitude + offset.latitude, longitude: location.longitude + offset.longitude }}
                 member={membersByUser.get(location.user_id)}
+                ownProfile={profile}
                 userId={userId}
               />
-            ))
-          : null}
+            );
+          });
+        })}
         {approved
           ? locationMessages.map((message) => (
               <Marker
@@ -57,10 +75,44 @@ export function MapScreen({
             ))
           : null}
       </MapView>
-      <View style={styles.mapOverlay}>
-        <Text style={styles.mapTitle}>{activeGroup ? activeGroup.name : 'Ingen grupp vald'}</Text>
-        <Text style={styles.mapSubtitle}>{approved ? 'Livekarta för godkända medlemmar' : 'Kartan öppnas efter godkänd grupp'}</Text>
-      </View>
     </View>
   );
+}
+
+function groupNearbyLocations(locations: LocationRow[], region: Region) {
+  const groups: { center: LocationRow; items: LocationRow[] }[] = [];
+  const thresholdMeters = Math.max(8, (region.longitudeDelta * 111_320 * 18) / 390);
+  locations.forEach((location) => {
+    const group = groups.find((item) => distanceMeters(item.center.latitude, item.center.longitude, location.latitude, location.longitude) <= thresholdMeters);
+    if (group) {
+      group.items.push(location);
+      group.center = averageLocation(group.items);
+    } else {
+      groups.push({ center: location, items: [location] });
+    }
+  });
+  return groups.map((group) => group.items);
+}
+
+function averageLocation(locations: LocationRow[]) {
+  const total = locations.reduce(
+    (sum, location) => ({ latitude: sum.latitude + location.latitude, longitude: sum.longitude + location.longitude }),
+    { latitude: 0, longitude: 0 },
+  );
+  return { ...locations[0], latitude: total.latitude / locations.length, longitude: total.longitude / locations.length };
+}
+
+function memberOffsets(count: number, region: Region) {
+  if (count <= 1) return [{ latitude: 0, longitude: 0 }];
+  const radiusPx = count === 2 ? 8 : 10;
+  const latitudePerPx = region.latitudeDelta / 285;
+  const longitudePerPx = region.longitudeDelta / 390;
+  const startAngle = count === 2 ? Math.PI : -Math.PI / 2;
+  return Array.from({ length: count }, (_, index) => {
+    const angle = startAngle + (index * 2 * Math.PI) / count;
+    return {
+      latitude: Math.sin(angle) * radiusPx * latitudePerPx,
+      longitude: Math.cos(angle) * radiusPx * longitudePerPx,
+    };
+  });
 }

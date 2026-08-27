@@ -61,6 +61,18 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setNoticeState(friendlyError(error, fallback));
   }, []);
 
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timeout = setTimeout(() => setNoticeState(''), 5000);
+    return () => clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!groupNotice) return undefined;
+    const timeout = setTimeout(() => setGroupNotice(''), 5000);
+    return () => clearTimeout(timeout);
+  }, [groupNotice]);
+
   const activeGroup = useMemo(
     () => memberships.find((item) => item.group_id === activeGroupId)?.groups ?? null,
     [activeGroupId, memberships],
@@ -114,7 +126,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   }, []);
 
   const refreshAll = useCallback(
-    async (requestedGroupId = activeGroupIdRef.current) => {
+    async (requestedGroupId?: string | null) => {
       const currentUser = userRef.current;
       if (!currentUser) {
         clearUserData();
@@ -126,6 +138,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       await touchAccountActivity();
 
       const currentMemberships = await loadMemberships(currentUser.id);
+      const approvedMemberships = currentMemberships.filter((membership) => membership.status === 'approved');
       const newlyApproved = currentMemberships.find((membership) => {
         const previous = previousMemberships.current.get(membership.group_id);
         return membership.status === 'approved' && previous && previous !== 'approved';
@@ -134,13 +147,20 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
 
       if (newlyApproved) {
         const name = newlyApproved.groups?.name ?? `Grupp ${newlyApproved.group_id.slice(0, 8)}`;
-        setGroupNotice(`Du är nu godkänd i ${name}.`);
+        setGroupNotice(`Du är nu med i ${name}.`);
         if (viewRef.current !== 'group') setUnreadGroup(true);
       }
 
-      let nextGroupId = requestedGroupId;
-      if (!nextGroupId || !currentMemberships.some((item) => item.group_id === nextGroupId)) {
-        nextGroupId = currentMemberships.find((item) => item.status === 'approved')?.group_id ?? currentMemberships[0]?.group_id ?? null;
+      const explicitGroupChoice = requestedGroupId !== undefined;
+      let nextGroupId = explicitGroupChoice ? requestedGroupId : activeGroupIdRef.current;
+      if (newlyApproved && !nextGroupId) {
+        nextGroupId = newlyApproved.group_id;
+      }
+      if (!explicitGroupChoice && (!nextGroupId || !approvedMemberships.some((item) => item.group_id === nextGroupId))) {
+        nextGroupId = approvedMemberships[0]?.group_id ?? null;
+      }
+      if (nextGroupId && !approvedMemberships.some((item) => item.group_id === nextGroupId)) {
+        nextGroupId = null;
       }
       activeGroupIdRef.current = nextGroupId;
       setActiveGroupIdState(nextGroupId);
@@ -333,7 +353,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
 
   useEffect(() => {
     async function startLocation() {
-      if (!activeGroupId || !approved || !user || !locationSharingEnabled) {
+      if (!user || !locationSharingEnabled) {
         locationSubscription.current?.remove();
         locationSubscription.current = null;
         return;
@@ -358,8 +378,9 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
             lastSent.current.lat === null ||
             (elapsed >= MIN_SEND_INTERVAL_MS && moved > MIN_SEND_DISTANCE_METERS) ||
             elapsed >= MAX_SEND_INTERVAL_MS;
+          const canShareToGroup = Boolean(activeGroupId && approved);
           const row = {
-            group_id: activeGroupId,
+            group_id: activeGroupId ?? '__own_position__',
             user_id: user.id,
             latitude,
             longitude,
@@ -369,6 +390,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
             updated_at: new Date().toISOString(),
           };
           setOwnLocation(row);
+          if (!canShareToGroup) return;
           if (!shouldSend) return;
           lastSent.current = { at: Date.now(), lat: latitude, lng: longitude };
           upsertLocation(row).catch((error) => showError(error, 'Kunde inte dela positionen.'));
@@ -384,8 +406,8 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
 
   const membersByUser = useMemo(() => new Map(members.map((member) => [member.user_id, member])), [members]);
   const visibleLocations = useMemo(() => {
-    const rows = [...locations];
-    if (ownLocation && !rows.some((row) => row.group_id === ownLocation.group_id && row.user_id === ownLocation.user_id)) rows.push(ownLocation);
+    const rows = user?.id && ownLocation ? locations.filter((row) => row.user_id !== user.id) : [...locations];
+    if (ownLocation) rows.push(ownLocation);
     return rows.filter((row) => {
       const age = Date.now() - new Date(row.updated_at).getTime();
       return age <= HIDDEN_LOCATION_MS && (row.user_id === user?.id || membersByUser.get(row.user_id)?.status === 'approved');

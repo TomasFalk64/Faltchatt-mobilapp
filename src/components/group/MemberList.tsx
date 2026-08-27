@@ -2,8 +2,9 @@ import { Text, View } from 'react-native';
 
 import { SmallButton } from '@/components/common/Buttons';
 import { confirmAction } from '@/components/common/confirmAction';
+import { FaltSymbol } from '@/components/common/FaltSymbol';
 import { Section } from '@/components/common/Section';
-import { ACTIVE_PRESENCE_MS, symbolGlyph } from '@/constants/faltchatt';
+import { ACTIVE_PRESENCE_MS } from '@/constants/faltchatt';
 import { friendlyError } from '@/lib/format';
 import { Member, Presence } from '@/lib/types';
 import { leaveGroup, removeMember, updateMember } from '@/services/groupService';
@@ -66,14 +67,18 @@ export function MemberList({
         .map((member) => {
           const activePresence = presence.find((row) => row.user_id === member.user_id && Date.now() - new Date(row.last_seen).getTime() <= ACTIVE_PRESENCE_MS);
           const name = member.profiles?.alias ?? `Användare ${member.user_id.slice(0, 8)}`;
+          const meta = [
+            member.role === 'owner' ? 'Owner' : member.role === 'admin' ? 'Admin' : '',
+            member.status === 'pending' ? 'Pending' : '',
+            activePresence?.is_sharing_location ? 'aktiv' : activePresence ? 'position av' : '',
+          ].filter(Boolean);
           return (
             <View key={member.id} style={styles.memberRow}>
-              <Text style={[styles.symbol, { color: member.profiles?.symbol_color ?? '#111827' }]}>{symbolGlyph(member.profiles?.symbol)}</Text>
+              <FaltSymbol color={member.profiles?.symbol_color ?? '#111827'} size={20} symbol={member.profiles?.symbol} />
               <View style={styles.memberMain}>
-                <Text style={styles.memberName}>{name}{member.user_id === userId ? ' (du)' : ''}</Text>
-                <Text style={styles.muted}>
-                  {member.role} · {member.status}
-                  {activePresence ? ` · aktiv · delar position ${activePresence.is_sharing_location ? 'ja' : 'nej'}` : ''}
+                <Text style={styles.memberLine} numberOfLines={1}>
+                  <Text style={styles.memberName}>{name}{member.user_id === userId ? ' (du)' : ''}</Text>
+                  {meta.length ? <Text style={styles.memberMeta}> {meta.join(' ')}</Text> : null}
                 </Text>
               </View>
               {canAdmin && member.status === 'pending' ? (

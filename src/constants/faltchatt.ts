@@ -1,13 +1,13 @@
 export const SYMBOLS = [
-  { id: 'hat', label: 'Hatt', glyph: '🎩' },
-  { id: 'tree', label: 'Träd', glyph: '🌲' },
-  { id: 'leaf', label: 'Löv', glyph: '🍃' },
-  { id: 'mushroom', label: 'Svamp', glyph: '🍄' },
+  { id: 'hat', label: 'Hatt', glyph: 'hat' },
+  { id: 'tree', label: 'Träd', glyph: 'tree' },
+  { id: 'leaf', label: 'Löv', glyph: 'leaf' },
+  { id: 'mushroom', label: 'Svamp', glyph: 'mushroom' },
   { id: 'star', label: 'Stjärna', glyph: '★' },
   { id: 'spade', label: 'Spader', glyph: '♠' },
   { id: 'heart', label: 'Hjärta', glyph: '♥' },
-  { id: 'train', label: 'Tåg', glyph: '🚆' },
-  { id: 'car', label: 'Bil', glyph: '🚗' },
+  { id: 'train', label: 'Tåg', glyph: 'train' },
+  { id: 'car', label: 'Bil', glyph: 'car' },
 ] as const;
 
 export const SYMBOL_COLORS = [

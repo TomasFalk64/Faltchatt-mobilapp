@@ -16,6 +16,8 @@ export function formatDateTime(value?: string | null) {
 
 export function friendlyError(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
+    if (code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) return 'Okänd användare eller fel lösenord.';
     if (error.message.includes('invalid or expired join code')) return 'Gruppkoden finns inte eller gruppen har gått ut.';
     if (error.message.includes('group member limit reached')) return 'Gruppen är full. Max 30 personer kan vara pending eller approved.';
     if (error.message.includes('max active groups reached')) return 'Max 30 pågående grupper finns redan.';
