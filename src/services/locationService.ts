@@ -18,6 +18,11 @@ export async function upsertLocation(row: LocationRow) {
   if (error) throw error;
 }
 
+export async function deleteOwnLocations(userId: string) {
+  const { error } = await requireSupabase().from('locations').delete().eq('user_id', userId);
+  if (error) throw error;
+}
+
 export async function touchPresence(row: Presence) {
   const { error } = await requireSupabase().from('group_presence').upsert(row, { onConflict: 'group_id,user_id' });
   if (error) throw error;

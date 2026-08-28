@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { View } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useEffect, useMemo, useState } from 'react';
+import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import MapView, { LatLng, Marker, Region } from 'react-native-maps';
 
 import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { MemberMarker } from '@/components/map/MemberMarker';
@@ -20,8 +21,9 @@ export function MapScreen({
   locations,
   locationMessages,
   mapRef,
+  mapTarget,
   membersByUser,
-  onOpenMessage,
+  onSendLocationMessage,
   ownLocation,
   profile,
   userId,
@@ -30,21 +32,71 @@ export function MapScreen({
   locations: LocationRow[];
   locationMessages: Message[];
   mapRef: React.RefObject<MapView | null>;
+  mapTarget: { latitude: number; longitude: number; messageId?: string; text?: string } | null;
   membersByUser: Map<string, Member>;
-  onOpenMessage: (message: Message) => void;
+  onSendLocationMessage: (text: string, latitude: number, longitude: number) => Promise<void>;
   ownLocation: LocationRow | null;
   profile: Profile | null;
   userId: string;
 }) {
   const [region, setRegion] = useState(DEFAULT_REGION);
+  const [hiddenLocationMessageIds, setHiddenLocationMessageIds] = useState<Set<string>>(new Set());
+  const [selectedLocationMessageId, setSelectedLocationMessageId] = useState<string | null>(null);
+  const [sendCoordinate, setSendCoordinate] = useState<LatLng | null>(null);
+  const [sendText, setSendText] = useState('Ses här om 20 min');
+  const [sending, setSending] = useState(false);
   const groupedLocations = useMemo(() => {
     const visibleLocations = ownLocation && !locations.some((location) => location.user_id === userId) ? [...locations, ownLocation] : locations;
     return groupNearbyLocations(visibleLocations, region);
   }, [locations, ownLocation, region, userId]);
 
+  useEffect(() => {
+    if (!mapTarget?.messageId) return;
+    setHiddenLocationMessageIds((current) => {
+      if (!current.has(mapTarget.messageId!)) return current;
+      const next = new Set(current);
+      next.delete(mapTarget.messageId!);
+      return next;
+    });
+    setSelectedLocationMessageId(mapTarget.messageId);
+  }, [mapTarget]);
+
+  async function sendSelectedLocation() {
+    if (!sendCoordinate) return;
+    try {
+      setSending(true);
+      await onSendLocationMessage(sendText, sendCoordinate.latitude, sendCoordinate.longitude);
+      setSendCoordinate(null);
+      setSendText('Ses här om 20 min');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function hideLocationMessage(messageId: string) {
+    setSelectedLocationMessageId(null);
+    setHiddenLocationMessageIds((current) => new Set(current).add(messageId));
+  }
+
+  const visibleLocationMessages = approved
+    ? locationMessages.filter((message) => !hiddenLocationMessageIds.has(message.id))
+    : [];
+  const selectedLocationMessage = visibleLocationMessages.find((message) => message.id === selectedLocationMessageId) ?? null;
+
   return (
     <View style={styles.mapWrap}>
-      <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION} showsUserLocation={false} onRegionChangeComplete={setRegion}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={DEFAULT_REGION}
+        showsUserLocation={false}
+        onLongPress={(event) => {
+          if (!approved) return;
+          setSendText('Ses här om 20 min');
+          setSendCoordinate(event.nativeEvent.coordinate);
+        }}
+        onPress={() => setSelectedLocationMessageId(null)}
+        onRegionChangeComplete={setRegion}>
         {groupedLocations.map((group) => {
           if (group.length > 5) {
             return <ClusterMarker key={group.map((location) => location.user_id).sort().join('|')} group={group} membersByUser={membersByUser} ownProfile={profile} userId={userId} />;
@@ -62,19 +114,51 @@ export function MapScreen({
             );
           });
         })}
-        {approved
-          ? locationMessages.map((message) => (
-              <Marker
-                key={message.id}
-                coordinate={{ latitude: message.latitude!, longitude: message.longitude! }}
-                pinColor="#111827"
-                title={message.text || 'Platsmeddelande'}
-                description="Tryck för att öppna i chatten"
-                onPress={() => onOpenMessage(message)}
-              />
-            ))
-          : null}
+        {visibleLocationMessages.map((message) => (
+          <Marker
+            key={message.id}
+            coordinate={{ latitude: message.latitude!, longitude: message.longitude! }}
+            pinColor="#111827"
+            title=""
+            onPress={(event) => {
+              event.stopPropagation();
+              setSelectedLocationMessageId(message.id);
+            }}
+          />
+        ))}
       </MapView>
+      {selectedLocationMessage ? (
+        <View style={styles.sentLocationPopup}>
+          <Text style={styles.sentLocationPopupText}>{selectedLocationMessage.text || 'Skickad plats'}</Text>
+          <Pressable hitSlop={8} style={styles.sentLocationClose} onPress={() => hideLocationMessage(selectedLocationMessage.id)}>
+            <MaterialCommunityIcons color="#253044" name="close" size={15} />
+          </Pressable>
+        </View>
+      ) : null}
+      <Modal transparent animationType="fade" visible={Boolean(sendCoordinate)} onRequestClose={() => setSendCoordinate(null)}>
+        <Pressable style={styles.mapSendBackdrop} onPress={() => setSendCoordinate(null)}>
+          <Pressable style={styles.mapSendPopup} onPress={() => {}}>
+            <View style={styles.mapSendHeader}>
+              <Text style={styles.mapSendTitle}>Skicka position?</Text>
+              <View style={styles.mapSendActions}>
+                <Pressable hitSlop={8} style={styles.mapSendIconButton} onPress={() => setSendCoordinate(null)}>
+                  <MaterialCommunityIcons color="#253044" name="close" size={19} />
+                </Pressable>
+                <Pressable disabled={sending} hitSlop={8} style={[styles.mapSendIconButton, styles.mapSendSubmit, sending && styles.disabled]} onPress={sendSelectedLocation}>
+                  <MaterialCommunityIcons color="#ffffff" name="send" size={18} />
+                </Pressable>
+              </View>
+            </View>
+            <TextInput
+              placeholder="Ses här om 20 min"
+              returnKeyType="done"
+              style={styles.input}
+              value={sendText}
+              onChangeText={setSendText}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

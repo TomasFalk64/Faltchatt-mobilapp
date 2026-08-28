@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { confirmAction } from '@/components/common/confirmAction';
@@ -141,29 +142,31 @@ export function SettingsScreen({
             <Pressable key={item} style={[styles.swatch, { backgroundColor: item }, color === item && styles.swatchActive]} onPress={() => setColor(item)} />
           ))}
         </View>
-        <View style={styles.rowBetween}>
+        <Pressable style={styles.checkboxRow} onPress={() => onSetSharing(!locationSharingEnabled)}>
+          <View style={[styles.checkbox, locationSharingEnabled && styles.checkboxChecked]}>
+            {locationSharingEnabled ? <MaterialCommunityIcons color="#ffffff" name="check" size={16} /> : null}
+          </View>
           <Text style={styles.label}>Visa och dela min position</Text>
-          <Pressable style={[styles.toggle, locationSharingEnabled && styles.toggleOn]} onPress={() => onSetSharing(!locationSharingEnabled)}>
-            <Text style={styles.toggleText}>{locationSharingEnabled ? 'På' : 'Av'}</Text>
+        </Pressable>
+        <View style={styles.profileButtonRow}>
+          <Pressable style={[styles.primaryButton, styles.profileButton]} onPress={handleSaveProfile}>
+            <Text style={styles.primaryButtonText}>Spara profil</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, styles.profileButton]} onPress={() => signOut()}>
+            <Text style={styles.secondaryButtonText}>Logga ut</Text>
+          </Pressable>
+          <Pressable style={[styles.dangerButton, styles.profileButton]} onPress={() => confirmAction('Ta bort kontot permanent?', 'Det går inte att ångra.', handleDeleteAccount)}>
+            <Text style={styles.dangerButtonText}>Ta bort mitt konto</Text>
           </Pressable>
         </View>
-        <Pressable style={styles.primaryButton} onPress={handleSaveProfile}>
-          <Text style={styles.primaryButtonText}>Spara profil</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => signOut()}>
-          <Text style={styles.secondaryButtonText}>Logga ut</Text>
-        </Pressable>
-        <Pressable style={styles.dangerButton} onPress={() => confirmAction('Ta bort kontot permanent?', 'Det går inte att ångra.', handleDeleteAccount)}>
-          <Text style={styles.dangerButtonText}>Ta bort mitt konto</Text>
-        </Pressable>
       </Section>
     </View>
   );
 }
 
-export function PrivacySection() {
+export function PrivacySection({ collapsible = false, defaultCollapsed = false }: { collapsible?: boolean; defaultCollapsed?: boolean } = {}) {
   return (
-    <Section title="Integritet">
+    <Section collapsible={collapsible} defaultCollapsed={defaultCollapsed} title="Integritet">
       <Text style={styles.paragraph}>Fältchatt är en enkel gruppapp för fältarbete där medlemmar kan dela chatt och position inom vald grupp.</Text>
       <Text style={styles.paragraph}>Appen lagrar alias, vald symbol, symbolfärg, gruppmedlemskap, chatt, polls och platsdata som du själv delar.</Text>
       <Text style={styles.paragraph}>E-post används bara av Supabase Auth för inloggning, bekräftelse, lösenordsåterställning och eventuell kontovarning. Vanliga app-tabeller lagrar inte e-postadresser.</Text>

@@ -31,7 +31,7 @@ export function AdminScreen({
   if (!activeGroup) {
     return (
       <View style={styles.stack}>
-        <PrivacySection />
+        <PrivacySection collapsible defaultCollapsed />
         <EmptyState text="Välj en aktuell grupp för gruppadministration." />
       </View>
     );
@@ -40,7 +40,7 @@ export function AdminScreen({
   if (!canAdmin) {
     return (
       <View style={styles.stack}>
-        <PrivacySection />
+        <PrivacySection collapsible defaultCollapsed />
         <EmptyState text="Owner eller admin kan administrera vald grupp." />
       </View>
     );
@@ -48,7 +48,7 @@ export function AdminScreen({
 
   return (
     <View style={styles.stack}>
-      <PrivacySection />
+      <PrivacySection collapsible defaultCollapsed />
       {canOwn ? (
         <>
           <InvitationSection activeGroup={activeGroup} setNotice={setNotice} />
@@ -102,7 +102,7 @@ function InvitationSection({ activeGroup, setNotice }: { activeGroup: Group; set
   }
 
   return (
-    <Section title="Inbjudan">
+    <Section collapsible defaultCollapsed title="Inbjudan">
       <Text style={styles.muted}>Dela gruppkoden med personer som ska ansöka om medlemskap.</Text>
       <Text style={styles.infoTitle}>Gruppkod: {activeGroup.join_code}</Text>
       <Pressable style={styles.secondaryButton} onPress={copyInvite}>
@@ -142,7 +142,7 @@ function AdminRolesSection({
   }
 
   return (
-    <Section title="Ändra admin">
+    <Section collapsible defaultCollapsed title="Ändra admin">
       {!canOwn ? <Text style={styles.muted}>Befintliga serverregler tillåter bara owner att ändra adminroller.</Text> : null}
       {approvedMembers.map((member) => (
         <View key={member.id} style={styles.adminRoleRow}>
@@ -173,7 +173,7 @@ function OwnerButton({
   title: string;
 }) {
   return (
-    <Section title={label}>
+    <Section collapsible defaultCollapsed title={label}>
       <Text style={styles.muted}>{message}</Text>
       <Pressable style={styles.dangerButton} onPress={() => confirmAction(title, message, onPress)}>
         <Text style={styles.dangerButtonText}>{label}</Text>

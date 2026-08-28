@@ -1,7 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { FaltSymbol } from '@/components/common/FaltSymbol';
-import { formatRelative, friendlyError } from '@/lib/format';
+import { friendlyError } from '@/lib/format';
+import { chatSymbolSize } from '@/lib/symbolSizing';
 import { Member, Message, Question, QuestionAnswer } from '@/lib/types';
 import { answerQuestion } from '@/services/pollService';
 import { styles } from '@/styles/faltchattStyles';
@@ -10,7 +11,11 @@ export function PollMessage({
   answers,
   membersByUser,
   message,
+  metaText,
+  metaWidth,
+  metaVisible,
   onRefresh,
+  onToggleMeta,
   question,
   setNotice,
   userId,
@@ -18,15 +23,19 @@ export function PollMessage({
   answers: QuestionAnswer[];
   membersByUser: Map<string, Member>;
   message: Message;
+  metaText: string;
+  metaWidth: number;
+  metaVisible: boolean;
   onRefresh: () => Promise<void>;
+  onToggleMeta: () => void;
   question?: Question;
   setNotice: (text: string) => void;
   userId: string;
 }) {
   if (!question) return null;
   const member = membersByUser.get(message.user_id);
+  const own = message.user_id === userId;
   const questionAnswers = answers.filter((answer) => answer.question_id === question.id);
-  const answered = new Set(questionAnswers.map((answer) => answer.user_id));
 
   async function saveAnswer(optionId: string) {
     try {
@@ -38,12 +47,20 @@ export function PollMessage({
   }
 
   return (
-    <View style={styles.question}>
-      <View style={styles.messageMetaRow}>
-        <FaltSymbol color={member?.profiles?.symbol_color} size={14} symbol={member?.profiles?.symbol} />
-        <Text style={styles.messageMeta}>{member?.profiles?.alias ?? 'Okänd'} · {formatRelative(message.created_at)}</Text>
+    <View style={[styles.question, own && styles.questionOwn]}>
+      <View style={styles.chatMessageRow}>
+        <View style={styles.chatMessageSymbolWrap}>
+          <Pressable hitSlop={8} style={styles.chatMessageSymbol} onPress={onToggleMeta}>
+            <FaltSymbol color={member?.profiles?.symbol_color} size={chatSymbolSize(member?.profiles?.symbol)} symbol={member?.profiles?.symbol} />
+          </Pressable>
+          {metaVisible ? (
+            <Pressable style={[styles.chatMetaPopup, { width: metaWidth }]} onPress={onToggleMeta}>
+              <Text style={styles.chatMetaPopupText} numberOfLines={1}>{metaText}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.questionTitle}>{question.question_text}</Text>
       </View>
-      <Text style={styles.questionTitle}>{question.question_text}</Text>
       {(question.question_options ?? [])
         .slice()
         .sort((a, b) => a.sort_order - b.sort_order)
@@ -57,12 +74,6 @@ export function PollMessage({
             </Pressable>
           );
         })}
-      <Text style={styles.muted}>
-        Svarat: {questionAnswers.map((answerRow) => answerRow.profiles?.alias ?? membersByUser.get(answerRow.user_id)?.profiles?.alias ?? answerRow.user_id.slice(0, 8)).join(', ') || 'Ingen ännu'}
-      </Text>
-      <Text style={styles.muted}>
-        Ej svarat: {Array.from(membersByUser.values()).filter((memberRow) => memberRow.status === 'approved' && !answered.has(memberRow.user_id)).map((memberRow) => memberRow.profiles?.alias ?? memberRow.user_id.slice(0, 8)).join(', ') || 'Alla har svarat'}
-      </Text>
     </View>
   );
 }

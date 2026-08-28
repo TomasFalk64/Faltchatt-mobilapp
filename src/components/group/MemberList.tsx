@@ -74,7 +74,11 @@ export function MemberList({
           ].filter(Boolean);
           return (
             <View key={member.id} style={styles.memberRow}>
-              <FaltSymbol color={member.profiles?.symbol_color ?? '#111827'} size={20} symbol={member.profiles?.symbol} />
+              <FaltSymbol
+                color={member.profiles?.symbol_color ?? '#111827'}
+                size={member.profiles?.symbol === 'train' ? 20 : member.profiles?.symbol === 'hat' ? 16 : 24}
+                symbol={member.profiles?.symbol}
+              />
               <View style={styles.memberMain}>
                 <Text style={styles.memberLine} numberOfLines={1}>
                   <Text style={styles.memberName}>{name}{member.user_id === userId ? ' (du)' : ''}</Text>

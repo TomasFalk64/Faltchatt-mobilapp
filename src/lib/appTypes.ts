@@ -24,6 +24,7 @@ export type FaltchattState = GroupContext & {
   locationSharingEnabled: boolean;
   locations: LocationRow[];
   mapRef: React.RefObject<MapView | null>;
+  mapTarget: { latitude: number; longitude: number; messageId?: string; text?: string } | null;
   members: Member[];
   membersByUser: Map<string, Member>;
   memberships: Membership[];
@@ -48,7 +49,7 @@ export type FaltchattActions = {
   selectGroup: (groupId: string | null) => Promise<void>;
   setBusy: (busy: boolean) => void;
   setLocationSharingEnabled: (enabled: boolean) => Promise<void>;
-  setMapTarget: (target: { latitude: number; longitude: number; text?: string } | null) => void;
+  setMapTarget: (target: { latitude: number; longitude: number; messageId?: string; text?: string } | null) => void;
   setNotice: (text: string) => void;
   setPasswordRecoveryDone: () => void;
   setView: (view: ViewKey) => void;

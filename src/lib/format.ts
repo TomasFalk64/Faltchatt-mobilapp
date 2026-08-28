@@ -14,6 +14,11 @@ export function formatDateTime(value?: string | null) {
   return new Intl.DateTimeFormat('sv-SE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
+export function formatDate(value?: string | null) {
+  if (!value) return 'okänt datum';
+  return new Intl.DateTimeFormat('sv-SE', { dateStyle: 'short' }).format(new Date(value));
+}
+
 export function friendlyError(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
     const code = 'code' in error && typeof error.code === 'string' ? error.code : '';

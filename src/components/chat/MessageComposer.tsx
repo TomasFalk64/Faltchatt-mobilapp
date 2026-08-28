@@ -1,11 +1,9 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 
-import { SegmentButton } from '@/components/common/Buttons';
-import { Section } from '@/components/common/Section';
 import { friendlyError } from '@/lib/format';
-import { LocationRow } from '@/lib/types';
-import { sendLocationMessage, sendTextMessage } from '@/services/chatService';
+import { sendTextMessage } from '@/services/chatService';
 import { createQuestion } from '@/services/pollService';
 import { styles } from '@/styles/faltchattStyles';
 
@@ -13,7 +11,6 @@ export function MessageComposer({
   busy,
   groupId,
   onRefresh,
-  ownLocation,
   setBusy,
   setNotice,
   userId,
@@ -21,7 +18,6 @@ export function MessageComposer({
   busy: boolean;
   groupId: string;
   onRefresh: () => Promise<void>;
-  ownLocation: LocationRow | null;
   setBusy: (busy: boolean) => void;
   setNotice: (text: string) => void;
   userId: string;
@@ -54,39 +50,40 @@ export function MessageComposer({
     }
   }
 
-  async function sendPosition() {
-    if (!ownLocation) {
-      setNotice('Ingen aktuell egen position finns ännu.');
-      return;
-    }
-    try {
-      setBusy(true);
-      await sendLocationMessage(groupId, userId, text.trim() || 'Ses här om 20 min', ownLocation.latitude, ownLocation.longitude);
-      setText('');
-      await onRefresh();
-    } catch (error) {
-      setNotice(friendlyError(error, 'Kunde inte skicka platsmeddelande.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <Section title={pollMode ? 'Ny fråga' : 'Nytt meddelande'}>
-      <View style={styles.segment}>
-        <SegmentButton active={!pollMode} label="Text" onPress={() => setPollMode(false)} />
-        <SegmentButton active={pollMode} label="Fråga" onPress={() => setPollMode(true)} />
-      </View>
-      <TextInput multiline placeholder={pollMode ? 'Frågetext, t.ex. Fika?' : 'Skriv meddelande'} style={[styles.input, styles.textArea]} value={text} onChangeText={setText} />
-      {pollMode ? <TextInput placeholder="Alternativ separerade med kommatecken" style={styles.input} value={options} onChangeText={setOptions} /> : null}
-      <Pressable style={[styles.primaryButton, busy && styles.disabled]} disabled={busy} onPress={send}>
-        <Text style={styles.primaryButtonText}>Skicka</Text>
+    <View style={styles.chatComposer}>
+      <Pressable style={styles.composerModeButton} onPress={() => setPollMode((value) => !value)}>
+        <Text style={styles.composerModeText}>{pollMode ? 'Fråga' : 'Text'}</Text>
       </Pressable>
-      {!pollMode ? (
-        <Pressable style={[styles.secondaryButton, busy && styles.disabled]} disabled={busy} onPress={sendPosition}>
-          <Text style={styles.secondaryButtonText}>Skicka min position</Text>
-        </Pressable>
-      ) : null}
-    </Section>
+      <View style={styles.composerFields}>
+        <TextInput
+          blurOnSubmit
+          multiline
+          numberOfLines={pollMode ? 1 : 2}
+          placeholder={pollMode ? 'Frågetext, t.ex. fika?' : 'Skriv meddelande'}
+          placeholderTextColor="#8b95a1"
+          returnKeyType="done"
+          style={[styles.input, styles.composerInput, pollMode && styles.composerQuestionInput]}
+          value={text}
+          onChangeText={setText}
+          onSubmitEditing={Keyboard.dismiss}
+        />
+        {pollMode ? (
+          <TextInput
+            blurOnSubmit
+            placeholder="Alternativ, t.ex. kaffe, te, saft"
+            placeholderTextColor="#8b95a1"
+            returnKeyType="done"
+            style={[styles.input, styles.composerInput, styles.composerQuestionInput]}
+            value={options}
+            onChangeText={setOptions}
+            onSubmitEditing={Keyboard.dismiss}
+          />
+        ) : null}
+      </View>
+      <Pressable style={[styles.composerIconButton, busy && styles.disabled]} disabled={busy} onPress={send}>
+        <MaterialCommunityIcons color="#ffffff" name="send" size={22} />
+      </Pressable>
+    </View>
   );
 }

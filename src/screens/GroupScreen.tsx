@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { Section } from '@/components/common/Section';
 import { GroupSelector } from '@/components/group/GroupSelector';
 import { GroupStatus } from '@/components/group/GroupStatus';
 import { MemberList } from '@/components/group/MemberList';
-import { Section } from '@/components/common/Section';
 import { friendlyError } from '@/lib/format';
 import { Group, Member, Membership, Presence } from '@/lib/types';
 import { createGroup, requestMembership } from '@/services/groupService';
@@ -98,21 +98,24 @@ export function GroupScreen({
 
   return (
     <View style={styles.stack}>
-      <Section>
-        {showWelcome ? (
-          <View style={styles.groupStatusRow}>
-            <Text style={styles.groupStatusText}>Välkommen!</Text>
-          </View>
-        ) : null}
-        {pendingMembership ? (
-          <View style={styles.groupStatusRow}>
-            <Text style={styles.groupStatusText}>
-              Ansökt till gruppen <Text style={styles.groupStatusStrong}>{pendingGroupName}</Text>.
-            </Text>
-          </View>
-        ) : null}
-        <GroupSelector activeGroupId={activeGroupId} memberships={selectorMemberships} onSelectGroup={onSelectGroup} />
-      </Section>
+      {showWelcome || pendingMembership ? (
+        <Section>
+          {showWelcome ? (
+            <View style={styles.groupStatusRow}>
+              <Text style={styles.groupStatusText}>Välkommen!</Text>
+            </View>
+          ) : null}
+          {pendingMembership ? (
+            <View style={styles.groupStatusRow}>
+              <Text style={styles.groupStatusText}>
+                Ansökt till gruppen <Text style={styles.groupStatusStrong}>{pendingGroupName}</Text>.
+              </Text>
+            </View>
+          ) : null}
+        </Section>
+      ) : null}
+
+      <GroupSelector activeGroupId={activeGroupId} memberships={selectorMemberships} onSelectGroup={onSelectGroup} />
 
       <MemberList
         approved={approved}
@@ -142,7 +145,6 @@ export function GroupScreen({
         </Pressable>
         <Text style={styles.muted}>Grupper raderas automatiskt efter 7 dagar. Max 30 personer per grupp.</Text>
       </Section>
-
     </View>
   );
 }

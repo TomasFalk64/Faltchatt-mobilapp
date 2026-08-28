@@ -1,14 +1,15 @@
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { PollMessage } from '@/components/chat/PollMessage';
 import { FaltSymbol } from '@/components/common/FaltSymbol';
-import { Section } from '@/components/common/Section';
-import { formatRelative } from '@/lib/format';
+import { chatSymbolSize } from '@/lib/symbolSizing';
 import { Member, Message, Question, QuestionAnswer } from '@/lib/types';
 import { styles } from '@/styles/faltchattStyles';
 
 export function MessageList({
   answers,
+  keyboardVisible,
   membersByUser,
   messages,
   onRefresh,
@@ -18,48 +19,102 @@ export function MessageList({
   userId,
 }: {
   answers: QuestionAnswer[];
+  keyboardVisible: boolean;
   membersByUser: Map<string, Member>;
   messages: Message[];
   onRefresh: () => Promise<void>;
-  onShowOnMap: (latitude: number, longitude: number, text?: string) => void;
+  onShowOnMap: (messageId: string, latitude: number, longitude: number, text?: string) => void;
   questions: Map<string, Question>;
   setNotice: (text: string) => void;
   userId: string;
 }) {
-  return (
-    <Section>
-      {messages.map((message) => {
-        if (message.type === 'question') {
-          return (
-            <PollMessage
-              key={message.id}
-              answers={answers}
-              membersByUser={membersByUser}
-              message={message}
-              onRefresh={onRefresh}
-              question={questions.get(message.id)}
-              setNotice={setNotice}
-              userId={userId}
-            />
-          );
-        }
-        const member = membersByUser.get(message.user_id);
-        const own = message.user_id === userId;
-        return (
-          <View key={message.id} style={[styles.message, own && styles.messageOwn]}>
-            <View style={styles.messageMetaRow}>
-              <FaltSymbol color={member?.profiles?.symbol_color} size={14} symbol={member?.profiles?.symbol} />
-              <Text style={styles.messageMeta}>{member?.profiles?.alias ?? 'Okänd'} · {formatRelative(message.created_at)}</Text>
-            </View>
-            <Text style={styles.messageText}>{message.type === 'location' ? `Plats: ${message.text || 'Plats'}` : message.text}</Text>
-            {message.type === 'location' && message.latitude && message.longitude ? (
-              <Pressable style={styles.textButton} onPress={() => onShowOnMap(message.latitude!, message.longitude!, message.text)}>
-                <Text style={styles.textButtonText}>Visa på kartan</Text>
+  const listRef = useRef<FlatList<Message>>(null);
+  const [metaMessageId, setMetaMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  }, [keyboardVisible, messages.length]);
+
+  function toggleMeta(messageId: string) {
+    setMetaMessageId((value) => (value === messageId ? null : messageId));
+  }
+
+  function renderMessage({ item: message }: { item: Message }) {
+    const member = membersByUser.get(message.user_id);
+    const own = message.user_id === userId;
+    const metaVisible = metaMessageId === message.id;
+    const metaText = `${member?.profiles?.alias ?? 'Okänd'} ${formatClock(message.created_at)}`;
+    const metaWidth = metaPopupWidth(metaText);
+
+    if (message.type === 'question') {
+      return (
+        <PollMessage
+          answers={answers}
+          membersByUser={membersByUser}
+          message={message}
+          metaText={metaText}
+          metaWidth={metaWidth}
+          metaVisible={metaVisible}
+          onRefresh={onRefresh}
+          onToggleMeta={() => toggleMeta(message.id)}
+          question={questions.get(message.id)}
+          setNotice={setNotice}
+          userId={userId}
+        />
+      );
+    }
+
+    const text = message.type === 'location' ? `Plats: ${message.text || 'Plats'}` : message.text;
+
+    return (
+      <View style={[styles.message, own && styles.messageOwn]}>
+        <View style={styles.chatMessageRow}>
+          <View style={styles.chatMessageSymbolWrap}>
+            <Pressable hitSlop={8} style={styles.chatMessageSymbol} onPress={() => toggleMeta(message.id)}>
+              <FaltSymbol color={member?.profiles?.symbol_color} size={chatSymbolSize(member?.profiles?.symbol)} symbol={member?.profiles?.symbol} />
+            </Pressable>
+            {metaVisible ? (
+              <Pressable style={[styles.chatMetaPopup, { width: metaWidth }]} onPress={() => setMetaMessageId(null)}>
+                <Text style={styles.chatMetaPopupText} numberOfLines={1}>{metaText}</Text>
               </Pressable>
             ) : null}
           </View>
-        );
-      })}
-    </Section>
+          <Text style={styles.messageText}>{text}</Text>
+        </View>
+        {message.type === 'location' && message.latitude && message.longitude ? (
+          <Pressable style={styles.textButton} onPress={() => onShowOnMap(message.id, message.latitude!, message.longitude!, message.text)}>
+            <Text style={styles.textButtonText}>Visa på kartan</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      ref={listRef}
+      data={messages}
+      keyExtractor={(message) => message.id}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      renderItem={renderMessage}
+      style={styles.chatList}
+      contentContainerStyle={styles.chatListContent}
+      onContentSizeChange={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }))}
+      onLayout={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }))}
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Text style={styles.muted}>Inga meddelanden ännu.</Text>
+        </View>
+      }
+    />
   );
+}
+
+function formatClock(value: string) {
+  return new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function metaPopupWidth(text: string) {
+  return Math.min(260, Math.max(84, text.length * 7 + 18));
 }

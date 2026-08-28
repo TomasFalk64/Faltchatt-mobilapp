@@ -18,7 +18,7 @@ import { LocationRow, Member, Membership, Message, Presence, Profile, Question, 
 import { ensureProfile, getInitialSession, onAuthStateChange, setRecoverySession, touchAccountActivity } from '@/services/authService';
 import { loadChatData } from '@/services/chatService';
 import { loadMembers, loadMemberships } from '@/services/groupService';
-import { loadLocations, loadPresence, touchPresence, upsertLocation } from '@/services/locationService';
+import { deleteOwnLocations, loadLocations, loadPresence, touchPresence, upsertLocation } from '@/services/locationService';
 
 const ACTIVE_GROUP_KEY = 'faltchatt.activeGroupId';
 const SHARE_LOCATION_KEY = 'faltchatt.locationSharingEnabled';
@@ -45,7 +45,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [locationSharingEnabled, setLocationSharingEnabledState] = useState(true);
   const [ownLocation, setOwnLocation] = useState<LocationRow | null>(null);
-  const [mapTarget, setMapTarget] = useState<{ latitude: number; longitude: number; text?: string } | null>(null);
+  const [mapTarget, setMapTarget] = useState<{ latitude: number; longitude: number; messageId?: string; text?: string } | null>(null);
   const mapRef = useRef<MapView>(null);
   const previousMemberships = useRef<Map<string, string>>(new Map());
   const activeGroupIdRef = useRef<string | null>(null);
@@ -93,11 +93,40 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     else await AsyncStorage.removeItem(ACTIVE_GROUP_KEY);
   }, []);
 
-  const setLocationSharingEnabled = useCallback(async (enabled: boolean) => {
-    locationSharingRef.current = enabled;
-    setLocationSharingEnabledState(enabled);
-    await AsyncStorage.setItem(SHARE_LOCATION_KEY, String(enabled));
-  }, []);
+  const setLocationSharingEnabled = useCallback(
+    async (enabled: boolean) => {
+      locationSharingRef.current = enabled;
+      setLocationSharingEnabledState(enabled);
+      await AsyncStorage.setItem(SHARE_LOCATION_KEY, String(enabled));
+
+      if (enabled) return;
+
+      locationSubscription.current?.remove();
+      locationSubscription.current = null;
+      lastSent.current = { at: 0, lat: null, lng: null };
+      setOwnLocation(null);
+
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+
+      setLocations((current) => current.filter((row) => row.user_id !== currentUser.id));
+      try {
+        await deleteOwnLocations(currentUser.id);
+        const currentGroupId = activeGroupIdRef.current;
+        if (currentGroupId) {
+          await touchPresence({
+            group_id: currentGroupId,
+            user_id: currentUser.id,
+            last_seen: new Date().toISOString(),
+            is_sharing_location: false,
+          });
+        }
+      } catch (error) {
+        showError(error, 'Kunde inte stänga av positionsdelningen helt.');
+      }
+    },
+    [showError],
+  );
 
   const setView = useCallback((nextView: ViewKey) => {
     viewRef.current = nextView;
@@ -368,6 +397,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       locationSubscription.current = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 5 },
         async (position) => {
+          if (!locationSharingRef.current) return;
           const { latitude, longitude, accuracy, heading, speed } = position.coords;
           const elapsed = Date.now() - lastSent.current.at;
           const moved =
@@ -443,6 +473,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     locationSharingEnabled,
     locations,
     mapRef,
+    mapTarget,
     members,
     membersByUser,
     memberships,

@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { Pressable, Text, View } from 'react-native';
 
-import { formatDateTime } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { Group } from '@/lib/types';
 import { styles } from '@/styles/faltchattStyles';
 
@@ -30,7 +30,7 @@ export function GroupStatus({
           <Text style={styles.codeButtonText}>{activeGroup.join_code}</Text>
         </Pressable>
       </View>
-      <Text style={styles.muted}>Gruppen raderas automatiskt: {formatDateTime(activeGroup.expires_at)}</Text>
+      <Text style={styles.muted}>Raderas automatiskt: {formatDate(activeGroup.expires_at)}</Text>
     </View>
   );
 }

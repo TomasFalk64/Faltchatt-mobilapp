@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useRef } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Keyboard, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorMessage } from '@/components/common/ErrorMessage';
@@ -9,6 +9,7 @@ import { StatusBanner } from '@/components/common/StatusBanner';
 import { TopBar } from '@/components/common/TopBar';
 import { useFaltchattApp } from '@/hooks/useFaltchattApp';
 import { ViewKey } from '@/lib/appTypes';
+import { friendlyError } from '@/lib/format';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { AdminScreen } from '@/screens/AdminScreen';
 import { AuthScreen } from '@/screens/AuthScreen';
@@ -16,11 +17,47 @@ import { ChatScreen } from '@/screens/ChatScreen';
 import { GroupScreen } from '@/screens/GroupScreen';
 import { MapScreen } from '@/screens/MapScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { sendLocationMessage } from '@/services/chatService';
 import { styles } from '@/styles/faltchattStyles';
 
 export default function FaltchattApp() {
   const { state, actions } = useFaltchattApp();
   const contentRef = useRef<ScrollView>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const hideMapForChatKeyboard = state.view === 'chat' && keyboardVisible;
+
+  async function sendMapLocationMessage(text: string, latitude: number, longitude: number) {
+    if (!state.activeGroup || !state.approved || !state.user) return;
+    try {
+      actions.setBusy(true);
+      await sendLocationMessage(state.activeGroup.id, state.user.id, text.trim() || 'Ses här om 20 min', latitude, longitude);
+      await actions.refreshAll(state.activeGroupId);
+      actions.setNotice('Platsen skickades.');
+    } catch (error) {
+      actions.setNotice(friendlyError(error, 'Kunde inte skicka platsen.'));
+    } finally {
+      actions.setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   if (!isSupabaseConfigured) {
     return <ErrorMessage text="Supabase saknar konfiguration. Lägg EXPO_PUBLIC_SUPABASE_URL och EXPO_PUBLIC_SUPABASE_ANON_KEY i .env.local." />;
@@ -33,15 +70,15 @@ export default function FaltchattApp() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {state.user ? (
-          <>
-            <TopBar
-              alias={state.profile?.alias ?? state.user.email ?? 'Profil'}
-              groupName={state.activeGroup?.name ?? 'Ingen grupp vald'}
-              onOpenProfile={() => actions.setView('profile')}
-              setNotice={actions.setNotice}
-            />
+      {state.user ? (
+        <>
+          <TopBar
+            alias={state.profile?.alias ?? state.user.email ?? 'Profil'}
+            groupName={state.activeGroup?.name ?? 'Ingen grupp vald'}
+            onOpenProfile={() => actions.setView('profile')}
+            setNotice={actions.setNotice}
+          />
+          {hideMapForChatKeyboard ? null : (
             <View style={styles.mapWithNotice}>
               <MapScreen
                 approved={state.approved}
@@ -49,7 +86,8 @@ export default function FaltchattApp() {
                 locationMessages={state.locationMessages}
                 mapRef={state.mapRef}
                 membersByUser={state.membersByUser}
-                onOpenMessage={(message) => actions.setMapTarget({ latitude: message.latitude!, longitude: message.longitude!, text: message.text })}
+                mapTarget={state.mapTarget}
+                onSendLocationMessage={sendMapLocationMessage}
                 ownLocation={state.ownLocation}
                 profile={state.profile}
                 userId={state.user.id}
@@ -61,12 +99,31 @@ export default function FaltchattApp() {
                 </View>
               ) : null}
             </View>
-            <TabBar
-              unreadChat={state.unreadChat}
-              unreadGroup={state.unreadGroup}
-              value={state.view}
-              onChange={actions.setView}
+          )}
+          <TabBar
+            unreadChat={state.unreadChat}
+            unreadGroup={state.unreadGroup}
+            value={state.view}
+            onChange={actions.setView}
+          />
+          {state.view === 'chat' ? (
+            <ChatScreen
+              activeGroup={state.activeGroup}
+              approved={state.approved}
+              answers={state.answers}
+              busy={state.busy}
+              keyboardHeight={keyboardHeight}
+              keyboardVisible={keyboardVisible}
+              membersByUser={state.membersByUser}
+              messages={state.messages}
+              onRefresh={() => actions.refreshAll(state.activeGroupId)}
+              onShowOnMap={(messageId, latitude, longitude, text) => actions.setMapTarget({ latitude, longitude, messageId, text })}
+              questions={state.questions}
+              setBusy={actions.setBusy}
+              setNotice={actions.setNotice}
+              userId={state.user.id}
             />
+          ) : (
             <ScrollView ref={contentRef} style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled">
               {state.view === 'group' ? (
                 <GroupScreen
@@ -82,23 +139,6 @@ export default function FaltchattApp() {
                   onScrollToTop={() => contentRef.current?.scrollTo({ y: 0, animated: true })}
                   onSelectGroup={actions.selectGroup}
                   presence={state.presence}
-                  setBusy={actions.setBusy}
-                  setNotice={actions.setNotice}
-                  userId={state.user.id}
-                />
-              ) : null}
-              {state.view === 'chat' ? (
-                <ChatScreen
-                  activeGroup={state.activeGroup}
-                  approved={state.approved}
-                  answers={state.answers}
-                  busy={state.busy}
-                  membersByUser={state.membersByUser}
-                  messages={state.messages}
-                  onRefresh={() => actions.refreshAll(state.activeGroupId)}
-                  onShowOnMap={(latitude, longitude, text) => actions.setMapTarget({ latitude, longitude, text })}
-                  ownLocation={state.ownLocation}
-                  questions={state.questions}
                   setBusy={actions.setBusy}
                   setNotice={actions.setNotice}
                   userId={state.user.id}
@@ -131,11 +171,11 @@ export default function FaltchattApp() {
                 />
               ) : null}
             </ScrollView>
-          </>
-        ) : (
-          <AuthScreen setNotice={actions.setNotice} />
-        )}
-      </KeyboardAvoidingView>
+          )}
+        </>
+      ) : (
+        <AuthScreen setNotice={actions.setNotice} />
+      )}
     </SafeAreaView>
   );
 }
@@ -160,8 +200,17 @@ function TabBar({
 
   return (
     <View style={styles.tabs}>
-      {tabs.filter((tab) => tab.visible !== false).map((tab) => (
-        <Pressable key={tab.key} style={[styles.tab, value === tab.key && styles.tabActive]} onPress={() => onChange(tab.key)}>
+      {tabs.filter((tab) => tab.visible !== false).map((tab, index, visibleTabs) => (
+        <Pressable
+          key={tab.key}
+          style={[
+            styles.tab,
+            index === 0 && styles.tabFirst,
+            index > 0 && index < visibleTabs.length - 1 && styles.tabMiddle,
+            index === visibleTabs.length - 1 && styles.tabLast,
+            value === tab.key && styles.tabActive,
+          ]}
+          onPress={() => onChange(tab.key)}>
           <Text style={[styles.tabText, value === tab.key && styles.tabTextActive]}>{tab.label}</Text>
           {tab.dot ? <View style={styles.dot} /> : null}
         </Pressable>
