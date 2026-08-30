@@ -102,11 +102,6 @@ export function MessageList({
       contentContainerStyle={styles.chatListContent}
       onContentSizeChange={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }))}
       onLayout={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }))}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.muted}>Inga meddelanden ännu.</Text>
-        </View>
-      }
     />
   );
 }

@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { confirmAction } from '@/components/common/confirmAction';
@@ -6,6 +7,7 @@ import { Section } from '@/components/common/Section';
 import { friendlyError } from '@/lib/format';
 import { Group, Member } from '@/lib/types';
 import { clearGroupChat, clearLocationPins, deleteGroup, updateMember } from '@/services/groupService';
+import { GroupMapCache, pickGeoTiff, syncGroupMapCache, uploadGroupGeoTiff } from '@/services/mapService';
 import { styles } from '@/styles/faltchattStyles';
 import { PrivacySection } from './SettingsScreen';
 
@@ -53,6 +55,7 @@ export function AdminScreen({
         <>
           <InvitationSection activeGroup={activeGroup} setNotice={setNotice} />
           <AdminRolesSection canOwn={canOwn} members={members} onRefresh={onRefresh} setBusy={setBusy} setNotice={setNotice} />
+          <MapUploadSection activeGroup={activeGroup} onRefresh={onRefresh} setBusy={setBusy} setNotice={setNotice} />
           <OwnerButton
             label="Rensa platsnålar"
             message="Platsmeddelanden tas bort permanent."
@@ -82,6 +85,7 @@ export function AdminScreen({
       ) : (
         <>
           <AdminRolesSection canOwn={canOwn} members={members} onRefresh={onRefresh} setBusy={setBusy} setNotice={setNotice} />
+          <MapUploadSection activeGroup={activeGroup} onRefresh={onRefresh} setBusy={setBusy} setNotice={setNotice} />
           <InvitationSection activeGroup={activeGroup} setNotice={setNotice} />
         </>
       )}
@@ -89,13 +93,69 @@ export function AdminScreen({
   );
 }
 
+function MapUploadSection({
+  activeGroup,
+  onRefresh,
+  setBusy,
+  setNotice,
+}: {
+  activeGroup: Group;
+  onRefresh: () => Promise<void>;
+  setBusy: (busy: boolean) => void;
+  setNotice: (text: string) => void;
+}) {
+  const [cache, setCache] = useState<GroupMapCache | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    syncGroupMapCache(activeGroup)
+      .then((nextCache) => {
+        if (mounted) setCache(nextCache);
+      })
+      .catch(() => {
+        if (mounted) setCache(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [activeGroup]);
+
+  async function uploadMap() {
+    try {
+      const asset = await pickGeoTiff();
+      if (!asset) return;
+      setBusy(true);
+      const nextCache = await uploadGroupGeoTiff(activeGroup.id, asset);
+      setCache(nextCache);
+      await onRefresh();
+      setNotice('Kartan laddades upp. PNG-versionen hämtas automatiskt när servern har konverterat den.');
+    } catch (error) {
+      setNotice(friendlyError(error, 'Kunde inte ladda upp GeoTIFF.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section collapsible defaultCollapsed title="Ladda karta">
+      <Text style={styles.muted}>Ladda upp en karta max 1000*1000px.</Text>
+      <Pressable style={styles.secondaryButton} onPress={uploadMap}>
+        <Text style={styles.secondaryButtonText}>Ladda upp GeoTiff</Text>
+      </Pressable>
+      <Text style={styles.mapUploadFileText}>{cache?.displayName ?? 'Ingen karta uppladdad'}</Text>
+    </Section>
+  );
+}
+
 function InvitationSection({ activeGroup, setNotice }: { activeGroup: Group; setNotice: (text: string) => void }) {
   async function copyInvite() {
     const text = [
-      `Du har blivit inbjuden till ${activeGroup.name} i Fältchatt.`,
+      'Hej',
+      `Du har blivit inbjuden till gruppen ${activeGroup.name}.`,
+      '',
       `Gruppkod: ${activeGroup.join_code}`,
-      'Ange gruppkoden i Fältchatt för att ansluta till grupp.',
-      'Om du inte har ett konto behöver du först skapa ett.',
+      '',
+      'Ange gruppkoden i Fältchatt för att ansluta till gruppen. Om du inte har ett konto behöver du först skapa ett.',
     ].join('\n');
     await Clipboard.setStringAsync(text);
     setNotice('Inbjudningstext kopierad.');
@@ -152,7 +212,7 @@ function AdminRolesSection({
           </View>
           {member.role !== 'owner' ? (
             <Pressable style={[styles.secondaryButton, !canOwn && styles.disabled, styles.roleButton]} disabled={!canOwn} onPress={() => toggleAdmin(member)}>
-              <Text style={styles.secondaryButtonText}>{member.role === 'admin' ? 'Gör medlem' : 'Gör admin'}</Text>
+              <Text style={styles.secondaryButtonText}>{member.role === 'admin' ? 'Gör till medlem' : 'Gör till admin'}</Text>
             </Pressable>
           ) : null}
         </View>

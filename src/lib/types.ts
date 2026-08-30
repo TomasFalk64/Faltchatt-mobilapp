@@ -11,6 +11,9 @@ export type Group = {
   name: string;
   owner_id: string;
   join_code: string;
+  map_file_path?: string | null;
+  map_image_path?: string | null;
+  map_image_version?: string | null;
   created_at: string;
   expires_at?: string | null;
 };

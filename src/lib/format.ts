@@ -22,6 +22,7 @@ export function formatDate(value?: string | null) {
 export function friendlyError(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
     const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
+    if (isJwtIssuedAtFutureError(error)) return 'Telefonens klocka verkar gå fel. Kontrollera datum och tid och försök igen.';
     if (code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) return 'Okänd användare eller fel lösenord.';
     if (error.message.includes('invalid or expired join code')) return 'Gruppkoden finns inte eller gruppen har gått ut.';
     if (error.message.includes('group member limit reached')) return 'Gruppen är full. Max 30 personer kan vara pending eller approved.';
@@ -30,6 +31,13 @@ export function friendlyError(error: unknown, fallback: string) {
     return error.message;
   }
   return fallback;
+}
+
+export function isJwtIssuedAtFutureError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
+  const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  return code === 'PGRST303' && message.toLowerCase().includes('jwt issued at future');
 }
 
 export function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number) {

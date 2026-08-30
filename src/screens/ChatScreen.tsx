@@ -10,7 +10,6 @@ export function ChatScreen({
   approved,
   answers,
   busy,
-  keyboardHeight,
   keyboardVisible,
   membersByUser,
   messages,
@@ -25,7 +24,6 @@ export function ChatScreen({
   approved: boolean;
   answers: QuestionAnswer[];
   busy: boolean;
-  keyboardHeight: number;
   keyboardVisible: boolean;
   membersByUser: Map<string, Member>;
   messages: Message[];
@@ -42,7 +40,7 @@ export function ChatScreen({
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={styles.chatScreen}>
       <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
-        <View style={[styles.chatScreen, Platform.OS === 'android' && keyboardVisible ? { paddingBottom: keyboardHeight } : null]}>
+        <View style={styles.chatScreen}>
           <MessageList
             answers={answers}
             keyboardVisible={keyboardVisible}

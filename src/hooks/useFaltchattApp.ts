@@ -12,7 +12,7 @@ import {
   MIN_SEND_INTERVAL_MS,
 } from '@/constants/faltchatt';
 import { FaltchattActions, FaltchattState, ViewKey } from '@/lib/appTypes';
-import { distanceMeters, friendlyError, groupExpired } from '@/lib/format';
+import { distanceMeters, friendlyError, groupExpired, isJwtIssuedAtFutureError } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { LocationRow, Member, Membership, Message, Presence, Profile, Question, QuestionAnswer } from '@/lib/types';
 import { ensureProfile, getInitialSession, onAuthStateChange, setRecoverySession, touchAccountActivity } from '@/services/authService';
@@ -57,7 +57,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
 
   const setNotice = useCallback((text: string) => setNoticeState(text), []);
   const showError = useCallback((error: unknown, fallback: string) => {
-    console.error(error);
+    if (!isJwtIssuedAtFutureError(error)) console.error(error);
     setNoticeState(friendlyError(error, fallback));
   }, []);
 

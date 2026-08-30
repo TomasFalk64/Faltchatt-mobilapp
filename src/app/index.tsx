@@ -24,7 +24,6 @@ export default function FaltchattApp() {
   const { state, actions } = useFaltchattApp();
   const contentRef = useRef<ScrollView>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const hideMapForChatKeyboard = state.view === 'chat' && keyboardVisible;
 
   async function sendMapLocationMessage(text: string, latitude: number, longitude: number) {
@@ -44,13 +43,11 @@ export default function FaltchattApp() {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+    const showSubscription = Keyboard.addListener(showEvent, () => {
       setKeyboardVisible(true);
-      setKeyboardHeight(event.endCoordinates.height);
     });
     const hideSubscription = Keyboard.addListener(hideEvent, () => {
       setKeyboardVisible(false);
-      setKeyboardHeight(0);
     });
 
     return () => {
@@ -112,7 +109,6 @@ export default function FaltchattApp() {
               approved={state.approved}
               answers={state.answers}
               busy={state.busy}
-              keyboardHeight={keyboardHeight}
               keyboardVisible={keyboardVisible}
               membersByUser={state.membersByUser}
               messages={state.messages}

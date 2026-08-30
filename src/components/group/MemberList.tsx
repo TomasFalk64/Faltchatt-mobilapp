@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { SmallButton } from '@/components/common/Buttons';
+import { SmallIconButton } from '@/components/common/Buttons';
 import { confirmAction } from '@/components/common/confirmAction';
 import { FaltSymbol } from '@/components/common/FaltSymbol';
 import { Section } from '@/components/common/Section';
@@ -87,17 +87,38 @@ export function MemberList({
               </View>
               {canAdmin && member.status === 'pending' ? (
                 <View style={styles.memberActions}>
-                  <SmallButton label="OK" onPress={() => saveMember(member, { status: 'approved', approved_at: new Date().toISOString() } as Partial<Member>)} />
-                  <SmallButton label="Avvisa" onPress={() => saveMember(member, { status: 'rejected' })} />
+                  <SmallIconButton
+                    accessibilityLabel={`Godkänn ${name}`}
+                    name="check"
+                    success
+                    onPress={() => saveMember(member, { status: 'approved', approved_at: new Date().toISOString() } as Partial<Member>)}
+                  />
+                  <SmallIconButton
+                    accessibilityLabel={`Avvisa ${name}`}
+                    danger
+                    name="close"
+                    onPress={() => saveMember(member, { status: 'rejected' })}
+                  />
                 </View>
               ) : null}
               {canOwn && member.status === 'approved' && member.role !== 'owner' ? (
                 <View style={styles.memberActions}>
-                  <SmallButton label={member.role === 'admin' ? 'member' : 'admin'} onPress={() => saveMember(member, { role: member.role === 'admin' ? 'member' : 'admin' })} />
-                  <SmallButton label="Ta bort" danger onPress={() => confirmAction('Ta bort medlem?', name, () => deleteMembership(member))} />
+                  <SmallIconButton
+                    accessibilityLabel={`Ta bort ${name}`}
+                    danger
+                    name="close"
+                    onPress={() => confirmAction('Ta bort medlem?', name, () => deleteMembership(member))}
+                  />
                 </View>
               ) : null}
-              {member.user_id === userId ? <SmallButton label="Gå ur" danger onPress={() => confirmAction('Gå ur gruppen?', '', () => deleteMembership(member))} /> : null}
+              {member.user_id === userId ? (
+                <SmallIconButton
+                  accessibilityLabel="Gå ur gruppen"
+                  danger
+                  name="close"
+                  onPress={() => confirmAction('Gå ur gruppen?', '', () => deleteMembership(member))}
+                />
+              ) : null}
             </View>
           );
         })}
