@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { MapType } from 'react-native-maps';
 
 import { confirmAction } from '@/components/common/confirmAction';
 import { FaltSymbol } from '@/components/common/FaltSymbol';
@@ -11,26 +12,40 @@ import { Profile } from '@/lib/types';
 import { deleteAccount, saveProfile, signOut, updatePassword } from '@/services/authService';
 import { styles } from '@/styles/faltchattStyles';
 
+const MAP_TYPE_OPTIONS: { label: string; value: MapType }[] = [
+  { label: 'Standard', value: 'standard' },
+  { label: 'Satellit', value: 'satellite' },
+  { label: 'Hybrid', value: 'hybrid' },
+];
+
 export function SettingsScreen({
   locationSharingEnabled,
+  mapType,
   onPasswordRecoveryDone,
   onRefresh,
+  onSetMapType,
   onSetSharing,
+  onSetShowGroupMapOverlay,
   passwordRecovery,
   profile,
   setBusy,
   setNotice,
+  showGroupMapOverlay,
   userEmail,
   userId,
 }: {
   locationSharingEnabled: boolean;
+  mapType: MapType;
   onPasswordRecoveryDone: () => void;
   onRefresh: () => Promise<void>;
+  onSetMapType: (mapType: MapType) => Promise<void>;
   onSetSharing: (enabled: boolean) => Promise<void>;
+  onSetShowGroupMapOverlay: (show: boolean) => Promise<void>;
   passwordRecovery: boolean;
   profile: Profile | null;
   setBusy: (busy: boolean) => void;
   setNotice: (text: string) => void;
+  showGroupMapOverlay: boolean;
   userEmail?: string;
   userId: string;
 }) {
@@ -141,6 +156,34 @@ export function SettingsScreen({
           {SYMBOL_COLORS.map((item) => (
             <Pressable key={item} style={[styles.swatch, { backgroundColor: item }, color === item && styles.swatchActive]} onPress={() => setColor(item)} />
           ))}
+        </View>
+        <View style={styles.preferenceRow}>
+          <Text style={styles.preferenceLabel}>Baskarta:</Text>
+          <View style={styles.segmentedControl}>
+            {MAP_TYPE_OPTIONS.map((item) => (
+              <Pressable
+                key={item.value}
+                style={[styles.segmentedButton, mapType === item.value && styles.segmentedButtonActive]}
+                onPress={() => onSetMapType(item.value)}>
+                <Text style={[styles.segmentedText, mapType === item.value && styles.segmentedTextActive]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View style={styles.preferenceRow}>
+          <Text style={styles.preferenceLabel}>Uppladdad karta:</Text>
+          <View style={styles.segmentedControl}>
+            <Pressable
+              style={[styles.segmentedButton, showGroupMapOverlay && styles.segmentedButtonActive]}
+              onPress={() => onSetShowGroupMapOverlay(true)}>
+              <Text style={[styles.segmentedText, showGroupMapOverlay && styles.segmentedTextActive]}>Visa</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segmentedButton, !showGroupMapOverlay && styles.segmentedButtonActive]}
+              onPress={() => onSetShowGroupMapOverlay(false)}>
+              <Text style={[styles.segmentedText, !showGroupMapOverlay && styles.segmentedTextActive]}>Dölj</Text>
+            </Pressable>
+          </View>
         </View>
         <Pressable style={styles.checkboxRow} onPress={() => onSetSharing(!locationSharingEnabled)}>
           <View style={[styles.checkbox, locationSharingEnabled && styles.checkboxChecked]}>

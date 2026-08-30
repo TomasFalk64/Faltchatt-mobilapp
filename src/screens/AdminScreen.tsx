@@ -7,7 +7,7 @@ import { Section } from '@/components/common/Section';
 import { friendlyError } from '@/lib/format';
 import { Group, Member } from '@/lib/types';
 import { clearGroupChat, clearLocationPins, deleteGroup, updateMember } from '@/services/groupService';
-import { GroupMapCache, pickGeoTiff, syncGroupMapCache, uploadGroupGeoTiff } from '@/services/mapService';
+import { GroupMapCache, pickGeoTiff, syncGroupMapCache, uploadConvertedGroupMap } from '@/services/mapService';
 import { styles } from '@/styles/faltchattStyles';
 import { PrivacySection } from './SettingsScreen';
 
@@ -105,6 +105,7 @@ function MapUploadSection({
   setNotice: (text: string) => void;
 }) {
   const [cache, setCache] = useState<GroupMapCache | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -125,24 +126,28 @@ function MapUploadSection({
       const asset = await pickGeoTiff();
       if (!asset) return;
       setBusy(true);
-      const nextCache = await uploadGroupGeoTiff(activeGroup.id, asset);
+      setProcessing(true);
+      const nextCache = await uploadConvertedGroupMap(activeGroup, asset);
       setCache(nextCache);
       await onRefresh();
-      setNotice('Kartan laddades upp. PNG-versionen hämtas automatiskt när servern har konverterat den.');
+      setNotice('Karta uppladdad.');
     } catch (error) {
       setNotice(friendlyError(error, 'Kunde inte ladda upp GeoTIFF.'));
     } finally {
+      setProcessing(false);
       setBusy(false);
     }
   }
 
   return (
     <Section collapsible defaultCollapsed title="Ladda karta">
-      <Text style={styles.muted}>Ladda upp en karta max 1000*1000px.</Text>
-      <Pressable style={styles.secondaryButton} onPress={uploadMap}>
-        <Text style={styles.secondaryButtonText}>Ladda upp GeoTiff</Text>
+      <Text style={styles.muted}>Ladda upp en karta max 1000×1000 px.</Text>
+      <Pressable disabled={processing} style={[styles.secondaryButton, processing && styles.disabled]} onPress={uploadMap}>
+        <Text style={styles.secondaryButtonText}>Ladda upp GeoTIFF</Text>
       </Pressable>
-      <Text style={styles.mapUploadFileText}>{cache?.displayName ?? 'Ingen karta uppladdad'}</Text>
+      <Text style={styles.mapUploadFileText}>
+        {processing ? 'Bearbetar karta...' : cache?.displayName ?? activeGroup.map_original_filename ?? 'Ingen karta uppladdad'}
+      </Text>
     </Section>
   );
 }

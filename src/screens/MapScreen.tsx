@@ -1,12 +1,13 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
-import MapView, { LatLng, Marker, Region } from 'react-native-maps';
+import MapView, { LatLng, MapType, Marker, Overlay, Region } from 'react-native-maps';
 
 import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { MemberMarker } from '@/components/map/MemberMarker';
 import { distanceMeters } from '@/lib/format';
 import { LocationRow, Member, Message, Profile } from '@/lib/types';
+import type { GroupMapOverlay } from '@/services/mapService';
 import { styles } from '@/styles/faltchattStyles';
 
 const DEFAULT_REGION: Region = {
@@ -18,25 +19,31 @@ const DEFAULT_REGION: Region = {
 
 export function MapScreen({
   approved,
+  groupMapOverlay,
   locations,
   locationMessages,
   mapRef,
   mapTarget,
+  mapType,
   membersByUser,
   onSendLocationMessage,
   ownLocation,
   profile,
+  showGroupMapOverlay,
   userId,
 }: {
   approved: boolean;
+  groupMapOverlay: GroupMapOverlay | null;
   locations: LocationRow[];
   locationMessages: Message[];
   mapRef: React.RefObject<MapView | null>;
   mapTarget: { latitude: number; longitude: number; messageId?: string; text?: string } | null;
+  mapType: MapType;
   membersByUser: Map<string, Member>;
   onSendLocationMessage: (text: string, latitude: number, longitude: number) => Promise<void>;
   ownLocation: LocationRow | null;
   profile: Profile | null;
+  showGroupMapOverlay: boolean;
   userId: string;
 }) {
   const [region, setRegion] = useState(DEFAULT_REGION);
@@ -89,6 +96,7 @@ export function MapScreen({
         ref={mapRef}
         style={styles.map}
         initialRegion={DEFAULT_REGION}
+        mapType={mapType}
         showsUserLocation={false}
         onLongPress={(event) => {
           if (!approved) return;
@@ -97,6 +105,16 @@ export function MapScreen({
         }}
         onPress={() => setSelectedLocationMessageId(null)}
         onRegionChangeComplete={setRegion}>
+        {approved && showGroupMapOverlay && groupMapOverlay ? (
+          <Overlay
+            bounds={[
+              [groupMapOverlay.south, groupMapOverlay.west],
+              [groupMapOverlay.north, groupMapOverlay.east],
+            ]}
+            image={{ uri: groupMapOverlay.localImageUri }}
+            opacity={0.8}
+          />
+        ) : null}
         {groupedLocations.map((group) => {
           if (group.length > 5) {
             return <ClusterMarker key={group.map((location) => location.user_id).sort().join('|')} group={group} membersByUser={membersByUser} ownProfile={profile} userId={userId} />;

@@ -1,7 +1,8 @@
 import { User } from '@supabase/supabase-js';
-import MapView from 'react-native-maps';
+import MapView, { MapType } from 'react-native-maps';
 
 import { Group, LocationRow, Member, Membership, Message, Presence, Profile, Question, QuestionAnswer } from '@/lib/types';
+import type { GroupMapOverlay } from '@/services/mapService';
 
 export type ViewKey = 'group' | 'chat' | 'profile' | 'admin';
 export type AuthMode = 'signin' | 'signup';
@@ -23,7 +24,10 @@ export type FaltchattState = GroupContext & {
   locationMessages: Message[];
   locationSharingEnabled: boolean;
   locations: LocationRow[];
+  mapType: MapType;
   mapRef: React.RefObject<MapView | null>;
+  groupMapOverlay: GroupMapOverlay | null;
+  showGroupMapOverlay: boolean;
   mapTarget: { latitude: number; longitude: number; messageId?: string; text?: string } | null;
   members: Member[];
   membersByUser: Map<string, Member>;
@@ -49,8 +53,10 @@ export type FaltchattActions = {
   selectGroup: (groupId: string | null) => Promise<void>;
   setBusy: (busy: boolean) => void;
   setLocationSharingEnabled: (enabled: boolean) => Promise<void>;
+  setMapType: (mapType: MapType) => Promise<void>;
   setMapTarget: (target: { latitude: number; longitude: number; messageId?: string; text?: string } | null) => void;
   setNotice: (text: string) => void;
   setPasswordRecoveryDone: () => void;
+  setShowGroupMapOverlay: (show: boolean) => Promise<void>;
   setView: (view: ViewKey) => void;
 };

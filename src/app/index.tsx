@@ -81,12 +81,15 @@ export default function FaltchattApp() {
                 approved={state.approved}
                 locations={state.visibleLocations}
                 locationMessages={state.locationMessages}
+                groupMapOverlay={state.groupMapOverlay}
                 mapRef={state.mapRef}
+                mapType={state.mapType}
                 membersByUser={state.membersByUser}
                 mapTarget={state.mapTarget}
                 onSendLocationMessage={sendMapLocationMessage}
                 ownLocation={state.ownLocation}
                 profile={state.profile}
+                showGroupMapOverlay={state.showGroupMapOverlay}
                 userId={state.user.id}
               />
               {state.notice || state.groupNotice ? (
@@ -143,13 +146,17 @@ export default function FaltchattApp() {
               {state.view === 'profile' ? (
                 <SettingsScreen
                   locationSharingEnabled={state.locationSharingEnabled}
+                  mapType={state.mapType}
                   onPasswordRecoveryDone={actions.setPasswordRecoveryDone}
                   onRefresh={() => actions.refreshAll(state.activeGroupId)}
+                  onSetMapType={actions.setMapType}
                   onSetSharing={actions.setLocationSharingEnabled}
+                  onSetShowGroupMapOverlay={actions.setShowGroupMapOverlay}
                   passwordRecovery={state.passwordRecovery}
                   profile={state.profile}
                   setBusy={actions.setBusy}
                   setNotice={actions.setNotice}
+                  showGroupMapOverlay={state.showGroupMapOverlay}
                   userEmail={state.user.email}
                   userId={state.user.id}
                 />

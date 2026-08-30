@@ -3,7 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import MapView from 'react-native-maps';
+import MapView, { MapType } from 'react-native-maps';
 
 import {
   HIDDEN_LOCATION_MS,
@@ -19,9 +19,14 @@ import { ensureProfile, getInitialSession, onAuthStateChange, setRecoverySession
 import { loadChatData } from '@/services/chatService';
 import { loadMembers, loadMemberships } from '@/services/groupService';
 import { deleteOwnLocations, loadLocations, loadPresence, touchPresence, upsertLocation } from '@/services/locationService';
+import { syncGroupMapCache } from '@/services/mapService';
+import type { GroupMapOverlay } from '@/services/mapService';
 
 const ACTIVE_GROUP_KEY = 'faltchatt.activeGroupId';
 const SHARE_LOCATION_KEY = 'faltchatt.locationSharingEnabled';
+const MAP_TYPE_KEY = 'faltchatt.mapType';
+const SHOW_GROUP_MAP_OVERLAY_KEY = 'faltchatt.showGroupMapOverlay';
+const MAP_TYPES: MapType[] = ['standard', 'satellite', 'hybrid'];
 
 export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattActions } {
   const [booting, setBooting] = useState(true);
@@ -34,6 +39,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   const [members, setMembers] = useState<Member[]>([]);
   const [presence, setPresence] = useState<Presence[]>([]);
   const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [groupMapOverlay, setGroupMapOverlay] = useState<GroupMapOverlay | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [questions, setQuestions] = useState<Map<string, Question>>(new Map());
   const [answers, setAnswers] = useState<QuestionAnswer[]>([]);
@@ -44,6 +50,8 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   const [groupNotice, setGroupNotice] = useState('');
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [locationSharingEnabled, setLocationSharingEnabledState] = useState(true);
+  const [mapType, setMapTypeState] = useState<MapType>('standard');
+  const [showGroupMapOverlay, setShowGroupMapOverlayState] = useState(true);
   const [ownLocation, setOwnLocation] = useState<LocationRow | null>(null);
   const [mapTarget, setMapTarget] = useState<{ latitude: number; longitude: number; messageId?: string; text?: string } | null>(null);
   const mapRef = useRef<MapView>(null);
@@ -128,6 +136,17 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     [showError],
   );
 
+  const setMapType = useCallback(async (nextMapType: MapType) => {
+    const safeMapType = MAP_TYPES.includes(nextMapType) ? nextMapType : 'standard';
+    setMapTypeState(safeMapType);
+    await AsyncStorage.setItem(MAP_TYPE_KEY, safeMapType);
+  }, []);
+
+  const setShowGroupMapOverlay = useCallback(async (show: boolean) => {
+    setShowGroupMapOverlayState(show);
+    await AsyncStorage.setItem(SHOW_GROUP_MAP_OVERLAY_KEY, String(show));
+  }, []);
+
   const setView = useCallback((nextView: ViewKey) => {
     viewRef.current = nextView;
     setViewState(nextView);
@@ -141,6 +160,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setMembers([]);
     setPresence([]);
     setLocations([]);
+    setGroupMapOverlay(null);
     setMessages([]);
     setQuestions(new Map());
     setAnswers([]);
@@ -204,8 +224,16 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
         setMembers([]);
         setPresence([]);
         setLocations([]);
+        setGroupMapOverlay(null);
         applyChatData(await loadChatData(null, false));
         return;
+      }
+
+      try {
+        setGroupMapOverlay(await syncGroupMapCache(activeMembership!.groups!));
+      } catch (error) {
+        setGroupMapOverlay(null);
+        console.error(error);
       }
 
       const [memberData, presenceData, locationData, chatData] = await Promise.all([
@@ -270,13 +298,21 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
         setBooting(false);
         return;
       }
-      const [storedGroupId, storedSharing] = await Promise.all([
+      const [storedGroupId, storedSharing, storedMapType, storedShowGroupMapOverlay] = await Promise.all([
         AsyncStorage.getItem(ACTIVE_GROUP_KEY),
         AsyncStorage.getItem(SHARE_LOCATION_KEY),
+        AsyncStorage.getItem(MAP_TYPE_KEY),
+        AsyncStorage.getItem(SHOW_GROUP_MAP_OVERLAY_KEY),
       ]);
       if (storedSharing !== null) {
         locationSharingRef.current = storedSharing === 'true';
         setLocationSharingEnabledState(storedSharing === 'true');
+      }
+      if (storedMapType && MAP_TYPES.includes(storedMapType as MapType)) {
+        setMapTypeState(storedMapType as MapType);
+      }
+      if (storedShowGroupMapOverlay !== null) {
+        setShowGroupMapOverlayState(storedShowGroupMapOverlay === 'true');
       }
       activeGroupIdRef.current = storedGroupId;
       setActiveGroupIdState(storedGroupId);
@@ -356,6 +392,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `group_id=eq.${activeGroupId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'question_answers', filter: `group_id=eq.${activeGroupId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_presence', filter: `group_id=eq.${activeGroupId}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${activeGroupId}` }, refresh)
       .subscribe();
     const timer = setInterval(refresh, 20000);
     return () => {
@@ -452,8 +489,8 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       {
         latitude: target.latitude,
         longitude: target.longitude,
-        latitudeDelta: 0.03,
-        longitudeDelta: 0.03,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
       },
       400,
     );
@@ -469,9 +506,11 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     canAdmin,
     canOwn,
     groupNotice,
+    groupMapOverlay,
     locationMessages,
     locationSharingEnabled,
     locations,
+    mapType,
     mapRef,
     mapTarget,
     members,
@@ -485,6 +524,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     profile,
     questions,
     role,
+    showGroupMapOverlay,
     unreadChat,
     unreadGroup,
     user,
@@ -499,9 +539,11 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     selectGroup,
     setBusy,
     setLocationSharingEnabled,
+    setMapType,
     setMapTarget,
     setNotice,
     setPasswordRecoveryDone: () => setPasswordRecovery(false),
+    setShowGroupMapOverlay,
     setView,
   };
 

@@ -592,6 +592,45 @@ export const styles = StyleSheet.create({
   colorWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: '#ffffff' },
   swatchActive: { borderColor: '#111827' },
+  preferenceRow: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  preferenceLabel: {
+    width: 104,
+    color: '#253044',
+    fontWeight: '700',
+  },
+  segmentedControl: {
+    flex: 1,
+    minHeight: 38,
+    flexDirection: 'row',
+    padding: 5,
+    borderRadius: 22,
+    backgroundColor: '#e5e9ef',
+  },
+  segmentedButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    paddingHorizontal: 6,
+  },
+  segmentedButtonActive: {
+    backgroundColor: '#006d77',
+  },
+  segmentedText: {
+    color: '#344154',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  segmentedTextActive: {
+    color: '#ffffff',
+  },
   empty: { padding: 18, borderRadius: 8, backgroundColor: '#ffffff' },
   dropdownBlock: {
     gap: 6,

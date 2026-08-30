@@ -14,6 +14,12 @@ export type Group = {
   map_file_path?: string | null;
   map_image_path?: string | null;
   map_image_version?: string | null;
+  map_north?: number | null;
+  map_south?: number | null;
+  map_east?: number | null;
+  map_west?: number | null;
+  map_original_filename?: string | null;
+  map_updated_at?: string | null;
   created_at: string;
   expires_at?: string | null;
 };
