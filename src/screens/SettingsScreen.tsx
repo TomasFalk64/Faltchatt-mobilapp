@@ -10,6 +10,7 @@ import { SYMBOL_COLORS, SYMBOLS } from '@/constants/faltchatt';
 import { friendlyError } from '@/lib/format';
 import { Profile } from '@/lib/types';
 import { deleteAccount, saveProfile, signOut, updatePassword } from '@/services/authService';
+import { MESSAGE_SOUND_OPTIONS, MessageSoundId } from '@/services/messageSoundService';
 import { styles } from '@/styles/faltchattStyles';
 
 const MAP_TYPE_OPTIONS: { label: string; value: MapType }[] = [
@@ -19,11 +20,15 @@ const MAP_TYPE_OPTIONS: { label: string; value: MapType }[] = [
 ];
 
 export function SettingsScreen({
+  backgroundLocationSharingEnabled,
   locationSharingEnabled,
   mapType,
+  messageSound,
   onPasswordRecoveryDone,
   onRefresh,
+  onSetBackgroundLocationSharingEnabled,
   onSetMapType,
+  onSetMessageSound,
   onSetSharing,
   onSetShowGroupMapOverlay,
   passwordRecovery,
@@ -34,11 +39,15 @@ export function SettingsScreen({
   userEmail,
   userId,
 }: {
+  backgroundLocationSharingEnabled: boolean;
   locationSharingEnabled: boolean;
   mapType: MapType;
+  messageSound: MessageSoundId;
   onPasswordRecoveryDone: () => void;
   onRefresh: () => Promise<void>;
+  onSetBackgroundLocationSharingEnabled: (enabled: boolean) => Promise<void>;
   onSetMapType: (mapType: MapType) => Promise<void>;
+  onSetMessageSound: (sound: MessageSoundId) => Promise<void>;
   onSetSharing: (enabled: boolean) => Promise<void>;
   onSetShowGroupMapOverlay: (show: boolean) => Promise<void>;
   passwordRecovery: boolean;
@@ -54,6 +63,12 @@ export function SettingsScreen({
   const [color, setColor] = useState(profile?.symbol_color ?? SYMBOL_COLORS[0]);
   const [newPassword, setNewPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
+
+  function cycleMessageSound() {
+    const currentIndex = MESSAGE_SOUND_OPTIONS.findIndex((item) => item.value === messageSound);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % MESSAGE_SOUND_OPTIONS.length : 0;
+    onSetMessageSound(MESSAGE_SOUND_OPTIONS[nextIndex].value);
+  }
 
   useEffect(() => {
     setAlias(profile?.alias ?? '');
@@ -157,6 +172,12 @@ export function SettingsScreen({
             <Pressable key={item} style={[styles.swatch, { backgroundColor: item }, color === item && styles.swatchActive]} onPress={() => setColor(item)} />
           ))}
         </View>
+        <View style={styles.profileButtonRow}>
+          <Pressable style={[styles.primaryButton, styles.profileButton]} onPress={handleSaveProfile}>
+            <Text style={styles.primaryButtonText}>Spara profil</Text>
+          </Pressable>
+        </View>
+        <View style={styles.preferenceDivider} />
         <View style={styles.preferenceRow}>
           <Text style={styles.preferenceLabel}>Baskarta:</Text>
           <View style={styles.segmentedControl}>
@@ -185,16 +206,27 @@ export function SettingsScreen({
             </Pressable>
           </View>
         </View>
+        <View style={styles.preferenceRow}>
+          <Text style={styles.preferenceLabel}>Meddelandeljud:</Text>
+          <View style={styles.segmentedControl}>
+            <Pressable style={[styles.segmentedButton, styles.segmentedButtonActive]} onPress={cycleMessageSound}>
+              <Text style={styles.segmentedTextActive}>{MESSAGE_SOUND_OPTIONS.find((item) => item.value === messageSound)?.label ?? 'Golgroda'}</Text>
+            </Pressable>
+          </View>
+        </View>
         <Pressable style={styles.checkboxRow} onPress={() => onSetSharing(!locationSharingEnabled)}>
           <View style={[styles.checkbox, locationSharingEnabled && styles.checkboxChecked]}>
             {locationSharingEnabled ? <MaterialCommunityIcons color="#ffffff" name="check" size={16} /> : null}
           </View>
           <Text style={styles.label}>Visa och dela min position</Text>
         </Pressable>
+        <Pressable style={styles.checkboxRow} onPress={() => onSetBackgroundLocationSharingEnabled(!backgroundLocationSharingEnabled)}>
+          <View style={[styles.checkbox, backgroundLocationSharingEnabled && styles.checkboxChecked]}>
+            {backgroundLocationSharingEnabled ? <MaterialCommunityIcons color="#ffffff" name="check" size={16} /> : null}
+          </View>
+          <Text style={styles.label}>Dela även i bakgrunden</Text>
+        </Pressable>
         <View style={styles.profileButtonRow}>
-          <Pressable style={[styles.primaryButton, styles.profileButton]} onPress={handleSaveProfile}>
-            <Text style={styles.primaryButtonText}>Spara profil</Text>
-          </Pressable>
           <Pressable style={[styles.secondaryButton, styles.profileButton]} onPress={() => signOut()}>
             <Text style={styles.secondaryButtonText}>Logga ut</Text>
           </Pressable>

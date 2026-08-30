@@ -145,11 +145,15 @@ export default function FaltchattApp() {
               ) : null}
               {state.view === 'profile' ? (
                 <SettingsScreen
+                  backgroundLocationSharingEnabled={state.backgroundLocationSharingEnabled}
                   locationSharingEnabled={state.locationSharingEnabled}
                   mapType={state.mapType}
+                  messageSound={state.messageSound}
                   onPasswordRecoveryDone={actions.setPasswordRecoveryDone}
                   onRefresh={() => actions.refreshAll(state.activeGroupId)}
+                  onSetBackgroundLocationSharingEnabled={actions.setBackgroundLocationSharingEnabled}
                   onSetMapType={actions.setMapType}
+                  onSetMessageSound={actions.setMessageSound}
                   onSetSharing={actions.setLocationSharingEnabled}
                   onSetShowGroupMapOverlay={actions.setShowGroupMapOverlay}
                   passwordRecovery={state.passwordRecovery}

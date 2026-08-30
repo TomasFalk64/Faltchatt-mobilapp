@@ -21,11 +21,14 @@ import { loadMembers, loadMemberships } from '@/services/groupService';
 import { deleteOwnLocations, loadLocations, loadPresence, touchPresence, upsertLocation } from '@/services/locationService';
 import { syncGroupMapCache } from '@/services/mapService';
 import type { GroupMapOverlay } from '@/services/mapService';
+import { DEFAULT_MESSAGE_SOUND, isMessageSoundId, MessageSoundId, playMessageSound } from '@/services/messageSoundService';
 
 const ACTIVE_GROUP_KEY = 'faltchatt.activeGroupId';
 const SHARE_LOCATION_KEY = 'faltchatt.locationSharingEnabled';
+const BACKGROUND_SHARE_LOCATION_KEY = 'faltchatt.backgroundLocationSharingEnabled';
 const MAP_TYPE_KEY = 'faltchatt.mapType';
 const SHOW_GROUP_MAP_OVERLAY_KEY = 'faltchatt.showGroupMapOverlay';
+const MESSAGE_SOUND_KEY = 'faltchatt.messageSound';
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'hybrid'];
 
 export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattActions } {
@@ -50,14 +53,19 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   const [groupNotice, setGroupNotice] = useState('');
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [locationSharingEnabled, setLocationSharingEnabledState] = useState(true);
+  const [backgroundLocationSharingEnabled, setBackgroundLocationSharingEnabledState] = useState(false);
   const [mapType, setMapTypeState] = useState<MapType>('standard');
   const [showGroupMapOverlay, setShowGroupMapOverlayState] = useState(true);
+  const [messageSound, setMessageSoundState] = useState<MessageSoundId>(DEFAULT_MESSAGE_SOUND);
   const [ownLocation, setOwnLocation] = useState<LocationRow | null>(null);
   const [mapTarget, setMapTarget] = useState<{ latitude: number; longitude: number; messageId?: string; text?: string } | null>(null);
   const mapRef = useRef<MapView>(null);
   const previousMemberships = useRef<Map<string, string>>(new Map());
   const activeGroupIdRef = useRef<string | null>(null);
+  const knownMessageGroupId = useRef<string | null>(null);
+  const knownMessageIds = useRef<Set<string> | null>(null);
   const locationSharingRef = useRef(true);
+  const messageSoundRef = useRef<MessageSoundId>(DEFAULT_MESSAGE_SOUND);
   const userRef = useRef<User | null>(null);
   const viewRef = useRef<ViewKey>('group');
   const lastSent = useRef<{ at: number; lat: number | null; lng: number | null }>({ at: 0, lat: null, lng: null });
@@ -142,9 +150,21 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     await AsyncStorage.setItem(MAP_TYPE_KEY, safeMapType);
   }, []);
 
+  const setBackgroundLocationSharingEnabled = useCallback(async (enabled: boolean) => {
+    setBackgroundLocationSharingEnabledState(enabled);
+    await AsyncStorage.setItem(BACKGROUND_SHARE_LOCATION_KEY, String(enabled));
+  }, []);
+
   const setShowGroupMapOverlay = useCallback(async (show: boolean) => {
     setShowGroupMapOverlayState(show);
     await AsyncStorage.setItem(SHOW_GROUP_MAP_OVERLAY_KEY, String(show));
+  }, []);
+
+  const setMessageSound = useCallback(async (sound: MessageSoundId) => {
+    messageSoundRef.current = sound;
+    setMessageSoundState(sound);
+    await AsyncStorage.setItem(MESSAGE_SOUND_KEY, sound);
+    playMessageSound(sound).catch(() => {});
   }, []);
 
   const setView = useCallback((nextView: ViewKey) => {
@@ -152,6 +172,12 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setViewState(nextView);
     if (nextView === 'chat') setUnreadChat(false);
     if (nextView === 'group') setUnreadGroup(false);
+  }, []);
+
+  const notifyIncomingMessage = useCallback((message: Message) => {
+    if (message.user_id === userRef.current?.id) return;
+    if (viewRef.current !== 'chat') setUnreadChat(true);
+    playMessageSound(messageSoundRef.current).catch((error) => console.warn('Kunde inte spela meddelandeljud.', error));
   }, []);
 
   const clearUserData = useCallback(() => {
@@ -165,14 +191,23 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setQuestions(new Map());
     setAnswers([]);
     setOwnLocation(null);
+    knownMessageGroupId.current = null;
+    knownMessageIds.current = null;
     setView('group');
   }, [setView]);
 
-  const applyChatData = useCallback((data: Awaited<ReturnType<typeof loadChatData>>) => {
+  const applyChatData = useCallback((data: Awaited<ReturnType<typeof loadChatData>>, groupId: string | null) => {
+    const nextIds = new Set(data.messages.map((message) => message.id));
+    if (groupId && knownMessageGroupId.current === groupId && knownMessageIds.current) {
+      const newIncomingMessages = data.messages.filter((message) => !knownMessageIds.current!.has(message.id) && message.user_id !== userRef.current?.id);
+      if (newIncomingMessages.length > 0) notifyIncomingMessage(newIncomingMessages[newIncomingMessages.length - 1]);
+    }
+    knownMessageGroupId.current = groupId;
+    knownMessageIds.current = nextIds;
     setMessages(data.messages);
     setQuestions(data.questions);
     setAnswers(data.answers);
-  }, []);
+  }, [notifyIncomingMessage]);
 
   const refreshAll = useCallback(
     async (requestedGroupId?: string | null) => {
@@ -225,7 +260,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
         setPresence([]);
         setLocations([]);
         setGroupMapOverlay(null);
-        applyChatData(await loadChatData(null, false));
+        applyChatData(await loadChatData(null, false), null);
         return;
       }
 
@@ -245,7 +280,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       setMembers(memberData);
       setPresence(presenceData);
       setLocations(locationData);
-      applyChatData(chatData);
+      applyChatData(chatData, nextGroupId);
     },
     [applyChatData, clearUserData],
   );
@@ -298,21 +333,30 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
         setBooting(false);
         return;
       }
-      const [storedGroupId, storedSharing, storedMapType, storedShowGroupMapOverlay] = await Promise.all([
+      const [storedGroupId, storedSharing, storedBackgroundSharing, storedMapType, storedShowGroupMapOverlay, storedMessageSound] = await Promise.all([
         AsyncStorage.getItem(ACTIVE_GROUP_KEY),
         AsyncStorage.getItem(SHARE_LOCATION_KEY),
+        AsyncStorage.getItem(BACKGROUND_SHARE_LOCATION_KEY),
         AsyncStorage.getItem(MAP_TYPE_KEY),
         AsyncStorage.getItem(SHOW_GROUP_MAP_OVERLAY_KEY),
+        AsyncStorage.getItem(MESSAGE_SOUND_KEY),
       ]);
       if (storedSharing !== null) {
         locationSharingRef.current = storedSharing === 'true';
         setLocationSharingEnabledState(storedSharing === 'true');
+      }
+      if (storedBackgroundSharing !== null) {
+        setBackgroundLocationSharingEnabledState(storedBackgroundSharing === 'true');
       }
       if (storedMapType && MAP_TYPES.includes(storedMapType as MapType)) {
         setMapTypeState(storedMapType as MapType);
       }
       if (storedShowGroupMapOverlay !== null) {
         setShowGroupMapOverlayState(storedShowGroupMapOverlay === 'true');
+      }
+      if (isMessageSoundId(storedMessageSound)) {
+        messageSoundRef.current = storedMessageSound;
+        setMessageSoundState(storedMessageSound);
       }
       activeGroupIdRef.current = storedGroupId;
       setActiveGroupIdState(storedGroupId);
@@ -357,14 +401,25 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     const client = supabase;
     const groupChannel = client
       .channel('mobile-group-memberships')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, (payload) => {
+        const row = (payload.new || payload.old) as Member;
+        if (
+          payload.eventType === 'INSERT' &&
+          canAdmin &&
+          row?.group_id === activeGroupIdRef.current &&
+          row.user_id !== user.id &&
+          row.status === 'pending' &&
+          viewRef.current !== 'group'
+        ) {
+          setUnreadGroup(true);
+        }
         refreshAll(activeGroupIdRef.current).catch((error) => showError(error, 'Kunde inte uppdatera gruppdata.'));
       })
       .subscribe();
     return () => {
       client.removeChannel(groupChannel);
     };
-  }, [refreshAll, showError, user]);
+  }, [canAdmin, refreshAll, showError, user]);
 
   useEffect(() => {
     if (!supabase || !activeGroupId || !approved || !user) return;
@@ -386,6 +441,11 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       .channel(`mobile-chat:${activeGroupId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${activeGroupId}` }, (payload) => {
         const row = (payload.new || payload.old) as Message;
+        if (payload.eventType === 'INSERT' && row?.user_id !== user.id) {
+          knownMessageGroupId.current = activeGroupId;
+          knownMessageIds.current = new Set([...(knownMessageIds.current ?? []), row.id]);
+          notifyIncomingMessage(row);
+        }
         if (payload.eventType !== 'DELETE' && row?.user_id !== user.id && viewRef.current !== 'chat') setUnreadChat(true);
         refresh();
       })
@@ -400,7 +460,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       client.removeChannel(locationsChannel);
       client.removeChannel(chatChannel);
     };
-  }, [activeGroupId, approved, refreshAll, showError, user]);
+  }, [activeGroupId, approved, notifyIncomingMessage, refreshAll, showError, user]);
 
   useEffect(() => {
     if (!activeGroupId || !approved || !user) return;
@@ -500,6 +560,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     activeGroup,
     activeGroupId,
     answers,
+    backgroundLocationSharingEnabled,
     approved,
     booting,
     busy,
@@ -511,6 +572,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     locationSharingEnabled,
     locations,
     mapType,
+    messageSound,
     mapRef,
     mapTarget,
     members,
@@ -537,10 +599,12 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     clearNotice: () => setNoticeState(''),
     refreshAll,
     selectGroup,
+    setBackgroundLocationSharingEnabled,
     setBusy,
     setLocationSharingEnabled,
     setMapType,
     setMapTarget,
+    setMessageSound,
     setNotice,
     setPasswordRecoveryDone: () => setPasswordRecovery(false),
     setShowGroupMapOverlay,

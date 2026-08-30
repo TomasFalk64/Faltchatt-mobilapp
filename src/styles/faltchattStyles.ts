@@ -431,6 +431,11 @@ export const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: 12,
   },
+  preferenceDivider: {
+    height: 1,
+    marginVertical: 3,
+    backgroundColor: '#e2e7ee',
+  },
   toggle: {
     minWidth: 62,
     minHeight: 34,
@@ -630,6 +635,9 @@ export const styles = StyleSheet.create({
   },
   segmentedTextActive: {
     color: '#ffffff',
+  },
+  preferenceDropdown: {
+    flex: 1,
   },
   empty: { padding: 18, borderRadius: 8, backgroundColor: '#ffffff' },
   dropdownBlock: {

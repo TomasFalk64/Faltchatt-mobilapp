@@ -3,6 +3,7 @@ import MapView, { MapType } from 'react-native-maps';
 
 import { Group, LocationRow, Member, Membership, Message, Presence, Profile, Question, QuestionAnswer } from '@/lib/types';
 import type { GroupMapOverlay } from '@/services/mapService';
+import type { MessageSoundId } from '@/services/messageSoundService';
 
 export type ViewKey = 'group' | 'chat' | 'profile' | 'admin';
 export type AuthMode = 'signin' | 'signup';
@@ -18,6 +19,7 @@ export type GroupContext = {
 
 export type FaltchattState = GroupContext & {
   answers: QuestionAnswer[];
+  backgroundLocationSharingEnabled: boolean;
   booting: boolean;
   busy: boolean;
   groupNotice: string;
@@ -25,6 +27,7 @@ export type FaltchattState = GroupContext & {
   locationSharingEnabled: boolean;
   locations: LocationRow[];
   mapType: MapType;
+  messageSound: MessageSoundId;
   mapRef: React.RefObject<MapView | null>;
   groupMapOverlay: GroupMapOverlay | null;
   showGroupMapOverlay: boolean;
@@ -51,10 +54,12 @@ export type FaltchattActions = {
   clearNotice: () => void;
   refreshAll: (requestedGroupId?: string | null) => Promise<void>;
   selectGroup: (groupId: string | null) => Promise<void>;
+  setBackgroundLocationSharingEnabled: (enabled: boolean) => Promise<void>;
   setBusy: (busy: boolean) => void;
   setLocationSharingEnabled: (enabled: boolean) => Promise<void>;
   setMapType: (mapType: MapType) => Promise<void>;
   setMapTarget: (target: { latitude: number; longitude: number; messageId?: string; text?: string } | null) => void;
+  setMessageSound: (sound: MessageSoundId) => Promise<void>;
   setNotice: (text: string) => void;
   setPasswordRecoveryDone: () => void;
   setShowGroupMapOverlay: (show: boolean) => Promise<void>;
