@@ -19,7 +19,9 @@ export type GroupContext = {
 
 export type FaltchattState = GroupContext & {
   answers: QuestionAnswer[];
+  backgroundLocationActive: boolean;
   backgroundLocationSharingEnabled: boolean;
+  backgroundLocationStatus: string;
   booting: boolean;
   busy: boolean;
   groupNotice: string;

@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import MapView, { MapType } from 'react-native-maps';
 
 import {
@@ -16,6 +17,12 @@ import { distanceMeters, friendlyError, groupExpired, isJwtIssuedAtFutureError }
 import { supabase } from '@/lib/supabase';
 import { LocationRow, Member, Membership, Message, Presence, Profile, Question, QuestionAnswer } from '@/lib/types';
 import { ensureProfile, getInitialSession, onAuthStateChange, setRecoverySession, touchAccountActivity } from '@/services/authService';
+import {
+  clearBackgroundLocationState,
+  requestBackgroundLocationPermission,
+  setBackgroundLocationAppActive,
+  syncBackgroundLocationUpdates,
+} from '@/services/backgroundLocationService';
 import { loadChatData } from '@/services/chatService';
 import { loadMembers, loadMemberships } from '@/services/groupService';
 import { deleteOwnLocations, loadLocations, loadPresence, touchPresence, upsertLocation } from '@/services/locationService';
@@ -54,6 +61,8 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [locationSharingEnabled, setLocationSharingEnabledState] = useState(true);
   const [backgroundLocationSharingEnabled, setBackgroundLocationSharingEnabledState] = useState(false);
+  const [backgroundLocationActive, setBackgroundLocationActive] = useState(false);
+  const [backgroundLocationStatus, setBackgroundLocationStatus] = useState('');
   const [mapType, setMapTypeState] = useState<MapType>('standard');
   const [showGroupMapOverlay, setShowGroupMapOverlayState] = useState(true);
   const [messageSound, setMessageSoundState] = useState<MessageSoundId>(DEFAULT_MESSAGE_SOUND);
@@ -89,6 +98,14 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     return () => clearTimeout(timeout);
   }, [groupNotice]);
 
+  useEffect(() => {
+    setBackgroundLocationAppActive(AppState.currentState === 'active').catch(() => {});
+    const subscription = AppState.addEventListener('change', (state) => {
+      setBackgroundLocationAppActive(state === 'active').catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
+
   const activeGroup = useMemo(
     () => memberships.find((item) => item.group_id === activeGroupId)?.groups ?? null,
     [activeGroupId, memberships],
@@ -107,6 +124,12 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setActiveGroupIdState(groupId);
     if (groupId) await AsyncStorage.setItem(ACTIVE_GROUP_KEY, groupId);
     else await AsyncStorage.removeItem(ACTIVE_GROUP_KEY);
+    await syncBackgroundLocationUpdates({
+      activeGroupId: groupId,
+      enabled: false,
+      userId: userRef.current?.id ?? null,
+    });
+    setBackgroundLocationActive(false);
   }, []);
 
   const setLocationSharingEnabled = useCallback(
@@ -117,12 +140,14 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
 
       if (enabled) return;
 
+      const currentUser = userRef.current;
+      setBackgroundLocationActive(false);
+      await syncBackgroundLocationUpdates({ activeGroupId: activeGroupIdRef.current, enabled: false, userId: currentUser?.id ?? null });
       locationSubscription.current?.remove();
       locationSubscription.current = null;
       lastSent.current = { at: 0, lat: null, lng: null };
       setOwnLocation(null);
 
-      const currentUser = userRef.current;
       if (!currentUser) return;
 
       setLocations((current) => current.filter((row) => row.user_id !== currentUser.id));
@@ -151,8 +176,26 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   }, []);
 
   const setBackgroundLocationSharingEnabled = useCallback(async (enabled: boolean) => {
+    if (enabled) {
+      const permission = await requestBackgroundLocationPermission();
+      if (!permission.granted) {
+        setBackgroundLocationSharingEnabledState(false);
+        setBackgroundLocationActive(false);
+        setBackgroundLocationStatus(permission.message);
+        await AsyncStorage.setItem(BACKGROUND_SHARE_LOCATION_KEY, 'false');
+        await syncBackgroundLocationUpdates({ activeGroupId: activeGroupIdRef.current, enabled: false, userId: userRef.current?.id ?? null });
+        return;
+      }
+    }
     setBackgroundLocationSharingEnabledState(enabled);
     await AsyncStorage.setItem(BACKGROUND_SHARE_LOCATION_KEY, String(enabled));
+    const active = await syncBackgroundLocationUpdates({
+      activeGroupId: activeGroupIdRef.current,
+      enabled: enabled && locationSharingRef.current,
+      userId: userRef.current?.id ?? null,
+    });
+    setBackgroundLocationActive(active);
+    setBackgroundLocationStatus(active ? 'Position delas även i bakgrunden.' : enabled ? 'Slå på Visa och dela min position för att dela i bakgrunden.' : '');
   }, []);
 
   const setShowGroupMapOverlay = useCallback(async (show: boolean) => {
@@ -180,7 +223,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     playMessageSound(messageSoundRef.current).catch((error) => console.warn('Kunde inte spela meddelandeljud.', error));
   }, []);
 
-  const clearUserData = useCallback(() => {
+  const clearUserData = useCallback(async () => {
     setProfile(null);
     setMemberships([]);
     setMembers([]);
@@ -191,8 +234,16 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     setQuestions(new Map());
     setAnswers([]);
     setOwnLocation(null);
+    activeGroupIdRef.current = null;
+    setActiveGroupIdState(null);
+    setBackgroundLocationSharingEnabledState(false);
     knownMessageGroupId.current = null;
     knownMessageIds.current = null;
+    setBackgroundLocationActive(false);
+    setBackgroundLocationStatus('');
+    await AsyncStorage.multiRemove([ACTIVE_GROUP_KEY]);
+    await AsyncStorage.setItem(BACKGROUND_SHARE_LOCATION_KEY, 'false');
+    await clearBackgroundLocationState();
     setView('group');
   }, [setView]);
 
@@ -213,7 +264,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     async (requestedGroupId?: string | null) => {
       const currentUser = userRef.current;
       if (!currentUser) {
-        clearUserData();
+        await clearUserData();
         return;
       }
 
@@ -254,6 +305,13 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       const activeMembership = currentMemberships.find((item) => item.group_id === nextGroupId);
       const isApproved = Boolean(activeMembership?.status === 'approved' && activeMembership.groups && !groupExpired(activeMembership.groups.expires_at));
       setMemberships(currentMemberships);
+      const backgroundActive = await syncBackgroundLocationUpdates({
+        activeGroupId: isApproved ? nextGroupId : null,
+        enabled: Boolean(isApproved && nextGroupId && backgroundLocationSharingEnabled && locationSharingRef.current),
+        userId: isApproved ? currentUser.id : null,
+      });
+      setBackgroundLocationActive(backgroundActive);
+      if (backgroundActive) setBackgroundLocationStatus('Position delas även i bakgrunden.');
 
       if (!nextGroupId || !isApproved) {
         setMembers([]);
@@ -282,7 +340,7 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
       setLocations(locationData);
       applyChatData(chatData, nextGroupId);
     },
-    [applyChatData, clearUserData],
+    [applyChatData, backgroundLocationSharingEnabled, clearUserData],
   );
 
   const selectGroup = useCallback(
@@ -478,6 +536,27 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
   }, [activeGroupId, approved, user]);
 
   useEffect(() => {
+    const wanted = Boolean(user && activeGroupId && approved && locationSharingEnabled && backgroundLocationSharingEnabled);
+    syncBackgroundLocationUpdates({
+      activeGroupId: wanted ? activeGroupId : null,
+      enabled: wanted,
+      userId: wanted ? user!.id : null,
+    })
+      .then((active) => {
+        setBackgroundLocationActive(active);
+        if (wanted && active) setBackgroundLocationStatus('Position delas även i bakgrunden.');
+        else if (wanted && !active) setBackgroundLocationStatus('Bakgrundsbehörighet saknas. Aktivera platsåtkomst hela tiden i telefonens appinställningar.');
+        else if (backgroundLocationSharingEnabled && !locationSharingEnabled) setBackgroundLocationStatus('Slå på Visa och dela min position för att dela i bakgrunden.');
+        else setBackgroundLocationStatus('');
+      })
+      .catch((error) => {
+        setBackgroundLocationActive(false);
+        setBackgroundLocationStatus('Kunde inte starta bakgrundsposition.');
+        showError(error, 'Kunde inte starta bakgrundsposition.');
+      });
+  }, [activeGroupId, approved, backgroundLocationSharingEnabled, locationSharingEnabled, showError, user]);
+
+  useEffect(() => {
     async function startLocation() {
       if (!user || !locationSharingEnabled) {
         locationSubscription.current?.remove();
@@ -560,7 +639,9 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
     activeGroup,
     activeGroupId,
     answers,
+    backgroundLocationActive,
     backgroundLocationSharingEnabled,
+    backgroundLocationStatus,
     approved,
     booting,
     busy,

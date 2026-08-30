@@ -436,6 +436,15 @@ export const styles = StyleSheet.create({
     marginVertical: 3,
     backgroundColor: '#e2e7ee',
   },
+  preferenceStatus: {
+    marginTop: -4,
+    color: '#667085',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  preferenceStatusActive: {
+    color: '#0f7a47',
+  },
   toggle: {
     minWidth: 62,
     minHeight: 34,

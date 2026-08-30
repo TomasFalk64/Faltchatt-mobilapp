@@ -145,7 +145,9 @@ export default function FaltchattApp() {
               ) : null}
               {state.view === 'profile' ? (
                 <SettingsScreen
+                  backgroundLocationActive={state.backgroundLocationActive}
                   backgroundLocationSharingEnabled={state.backgroundLocationSharingEnabled}
+                  backgroundLocationStatus={state.backgroundLocationStatus}
                   locationSharingEnabled={state.locationSharingEnabled}
                   mapType={state.mapType}
                   messageSound={state.messageSound}

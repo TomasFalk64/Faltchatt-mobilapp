@@ -8,7 +8,14 @@
     "scheme": "faltchattmobilapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Fältchatt kan dela din position med aktuell grupp även när appen ligger i bakgrunden.",
+        "NSLocationWhenInUseUsageDescription": "Fältchatt använder din position för att dela den med aktuell grupp när du väljer det.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +26,10 @@
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ],
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false
@@ -30,6 +40,16 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "Fältchatt kan dela din position med aktuell grupp även när appen ligger i bakgrunden.",
+          "locationWhenInUsePermission": "Fältchatt använder din position för att dela den med aktuell grupp när du väljer det."
+        }
+      ],
       [
         "expo-splash-screen",
         {

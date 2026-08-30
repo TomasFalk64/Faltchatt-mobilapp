@@ -20,7 +20,9 @@ const MAP_TYPE_OPTIONS: { label: string; value: MapType }[] = [
 ];
 
 export function SettingsScreen({
+  backgroundLocationActive,
   backgroundLocationSharingEnabled,
+  backgroundLocationStatus,
   locationSharingEnabled,
   mapType,
   messageSound,
@@ -39,7 +41,9 @@ export function SettingsScreen({
   userEmail,
   userId,
 }: {
+  backgroundLocationActive: boolean;
   backgroundLocationSharingEnabled: boolean;
+  backgroundLocationStatus: string;
   locationSharingEnabled: boolean;
   mapType: MapType;
   messageSound: MessageSoundId;
@@ -226,6 +230,9 @@ export function SettingsScreen({
           </View>
           <Text style={styles.label}>Dela även i bakgrunden</Text>
         </Pressable>
+        {backgroundLocationStatus ? (
+          <Text style={[styles.preferenceStatus, backgroundLocationActive ? styles.preferenceStatusActive : styles.warning]}>{backgroundLocationStatus}</Text>
+        ) : null}
         <View style={styles.profileButtonRow}>
           <Pressable style={[styles.secondaryButton, styles.profileButton]} onPress={() => signOut()}>
             <Text style={styles.secondaryButtonText}>Logga ut</Text>
