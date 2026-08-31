@@ -8,10 +8,11 @@
     "scheme": "faltchattmobilapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.tf64.faltchatt",
       "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Fältchatt kan dela din position med aktuell grupp även när appen ligger i bakgrunden.",
-        "NSLocationWhenInUseUsageDescription": "Fältchatt använder din position för att dela den med aktuell grupp när du väljer det.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Fältchatt kan dela din position med vald grupp även när appen ligger i bakgrunden eller skärmen är låst, om du själv aktiverar bakgrundsdelning.",
+        "NSLocationWhenInUseUsageDescription": "Fältchatt använder din position för att visa dig på kartan och dela din position med medlemmar i den grupp du har valt.",
         "UIBackgroundModes": [
           "location"
         ]
@@ -19,17 +20,17 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
@@ -49,16 +50,16 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true,
           "isIosBackgroundLocationEnabled": true,
-          "locationAlwaysAndWhenInUsePermission": "Fältchatt kan dela din position med aktuell grupp även när appen ligger i bakgrunden.",
-          "locationWhenInUsePermission": "Fältchatt använder din position för att dela den med aktuell grupp när du väljer det."
+          "locationAlwaysAndWhenInUsePermission": "Fältchatt behöver platsåtkomst för att visa och dela din position med vald grupp. Om du aktiverar bakgrundsdelning kan positionen delas även när appen ligger i bakgrunden eller skärmen är låst.",
+          "locationWhenInUsePermission": "Fältchatt använder din position för att visa dig på kartan och dela din position med medlemmar i den grupp du har valt."
         }
       ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#ffffff",
+          "image": "./assets/images/splash.png",
+          "imageWidth": 220
         }
       ],
       "expo-audio",

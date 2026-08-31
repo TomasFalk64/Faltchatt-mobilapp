@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fromByteArray } from 'base64-js';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import proj4 from 'proj4';
 import UPNG from 'upng-js';
 import * as UTIF from 'utif';
@@ -187,7 +188,9 @@ async function convertGeoTiffToPng(geoTiffUri: string, originalName: string) {
   const pngArrayBuffer = UPNG.encode([toArrayBuffer(scaled)], width, height, 0);
   MAP_CACHE_DIR.create({ idempotent: true, intermediates: true });
   const localImageUri = new File(MAP_CACHE_DIR, `${Date.now()}-${safeMapName(originalName)}.png`).uri;
-  new File(localImageUri).write(fromByteArray(new Uint8Array(pngArrayBuffer)), { encoding: 'base64' });
+  await FileSystem.writeAsStringAsync(localImageUri, fromByteArray(new Uint8Array(pngArrayBuffer)), {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 
   return {
     bounds: metadata.bounds,

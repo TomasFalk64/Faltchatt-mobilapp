@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
 import { signOut } from '@/services/authService';
 import { styles } from '@/styles/faltchattStyles';
@@ -26,7 +26,7 @@ export function TopBar({
   return (
     <View style={styles.topbar}>
       <View style={styles.topbarBrand}>
-        <View style={styles.topbarIcon} />
+        <Image source={require('../../../assets/images/icon.png')} style={styles.topbarIcon} />
         <Text style={styles.topbarTitle}>Fältchatt</Text>
       </View>
       <Text numberOfLines={1} style={styles.topbarGroup}>

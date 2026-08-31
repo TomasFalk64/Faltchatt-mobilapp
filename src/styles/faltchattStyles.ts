@@ -36,8 +36,7 @@ export const styles = StyleSheet.create({
   topbarIcon: {
     width: 22,
     height: 22,
-    borderRadius: 11,
-    backgroundColor: '#1565c0',
+    borderRadius: 5,
   },
   topbarTitle: {
     color: '#6b7280',
