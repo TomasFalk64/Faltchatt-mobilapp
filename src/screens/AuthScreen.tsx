@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { SegmentButton } from '@/components/common/Buttons';
 import { AuthMode } from '@/lib/appTypes';
@@ -12,6 +12,28 @@ export function AuthScreen({ setNotice }: { setNotice: (text: string) => void })
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const passwordRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  function keepFormVisible() {
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+  }
 
   async function submit() {
     try {
@@ -28,7 +50,7 @@ export function AuthScreen({ setNotice }: { setNotice: (text: string) => void })
 
   async function resetPassword() {
     if (!email.trim()) {
-      setNotice('Ange e-post först.');
+      Alert.alert('E-post saknas', 'Ange din e-postadress först.');
       return;
     }
     try {
@@ -41,21 +63,50 @@ export function AuthScreen({ setNotice }: { setNotice: (text: string) => void })
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.auth}>
-      <Text style={styles.brand}>Fältchatt</Text>
-      <Text style={styles.lead}>Logga in eller skapa konto för att dela position, karta och chatt med din grupp.</Text>
+    <ScrollView
+      ref={scrollRef}
+      keyboardShouldPersistTaps="handled"
+      style={styles.authScroll}
+      contentContainerStyle={[styles.auth, keyboardVisible && styles.authKeyboard]}>
+      <Text style={[styles.brand, keyboardVisible && styles.brandKeyboard]}>Fältchatt</Text>
       <View style={styles.segment}>
-        <SegmentButton active={mode === 'signin'} label="Logga in" onPress={() => setMode('signin')} />
-        <SegmentButton active={mode === 'signup'} label="Skapa konto" onPress={() => setMode('signup')} />
+        <SegmentButton active={mode === 'signin'} first label="Logga in" onPress={() => setMode('signin')} />
+        <SegmentButton active={mode === 'signup'} last label="Skapa konto" onPress={() => setMode('signup')} />
       </View>
-      <TextInput autoCapitalize="none" keyboardType="email-address" placeholder="E-post" style={styles.input} value={email} onChangeText={setEmail} />
-      <TextInput placeholder="Lösenord" secureTextEntry style={styles.input} value={password} onChangeText={setPassword} />
-      <Pressable style={[styles.primaryButton, busy && styles.disabled]} disabled={busy} onPress={submit}>
+      <TextInput
+        autoCapitalize="none"
+        autoComplete="email"
+        autoCorrect={false}
+        keyboardType="email-address"
+        onFocus={keepFormVisible}
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        placeholder="E-post"
+        returnKeyType="next"
+        style={styles.input}
+        textContentType="emailAddress"
+        value={email}
+        onChangeText={setEmail}
+      />
+      <TextInput
+        ref={passwordRef}
+        autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+        onFocus={keepFormVisible}
+        onSubmitEditing={submit}
+        placeholder="Lösenord"
+        returnKeyType="done"
+        secureTextEntry
+        style={styles.input}
+        textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+        value={password}
+        onChangeText={setPassword}
+      />
+      <Pressable style={[styles.primaryButton, styles.authPrimaryButton, busy && styles.disabled]} disabled={busy} onPress={submit}>
         <Text style={styles.primaryButtonText}>{busy ? 'Vänta...' : mode === 'signup' ? 'Skapa konto' : 'Logga in'}</Text>
       </Pressable>
-      <Pressable style={styles.textButton} onPress={resetPassword}>
-        <Text style={styles.textButtonText}>Återställ lösenord</Text>
+      <Pressable style={styles.authSecondaryButton} onPress={resetPassword}>
+        <Text style={styles.authSecondaryButtonText}>Återställ lösenord</Text>
       </Pressable>
+      <Text style={styles.authInfoText}>Logga in eller skapa konto för att dela position, karta och chatt med din grupp.</Text>
     </ScrollView>
   );
 }

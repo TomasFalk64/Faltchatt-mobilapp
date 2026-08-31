@@ -11,9 +11,6 @@ export function PollMessage({
   answers,
   membersByUser,
   message,
-  metaText,
-  metaWidth,
-  metaVisible,
   onRefresh,
   onToggleMeta,
   question,
@@ -23,9 +20,6 @@ export function PollMessage({
   answers: QuestionAnswer[];
   membersByUser: Map<string, Member>;
   message: Message;
-  metaText: string;
-  metaWidth: number;
-  metaVisible: boolean;
   onRefresh: () => Promise<void>;
   onToggleMeta: () => void;
   question?: Question;
@@ -53,11 +47,6 @@ export function PollMessage({
           <Pressable hitSlop={8} style={styles.chatMessageSymbol} onPress={onToggleMeta}>
             <FaltSymbol color={member?.profiles?.symbol_color} size={chatSymbolSize(member?.profiles?.symbol)} symbol={member?.profiles?.symbol} />
           </Pressable>
-          {metaVisible ? (
-            <Pressable style={[styles.chatMetaPopup, { width: metaWidth }]} onPress={onToggleMeta}>
-              <Text style={styles.chatMetaPopupText} numberOfLines={1}>{metaText}</Text>
-            </Pressable>
-          ) : null}
         </View>
         <Text style={styles.questionTitle}>{question.question_text}</Text>
       </View>

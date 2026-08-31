@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Section } from '@/components/common/Section';
@@ -20,6 +20,8 @@ export function GroupScreen({
   members,
   memberships,
   onRefresh,
+  onScrollToCreateGroup,
+  onScrollToJoinGroup,
   onScrollToTop,
   onSelectGroup,
   presence,
@@ -36,6 +38,8 @@ export function GroupScreen({
   members: Member[];
   memberships: Membership[];
   onRefresh: () => Promise<void>;
+  onScrollToCreateGroup: () => void;
+  onScrollToJoinGroup: (y: number) => void;
   onScrollToTop: () => void;
   onSelectGroup: (groupId: string | null) => Promise<void>;
   presence: Presence[];
@@ -45,6 +49,7 @@ export function GroupScreen({
 }) {
   const [groupName, setGroupName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const joinGroupY = useRef(0);
   const pendingMembership = memberships.find((membership) => membership.status === 'pending');
   const approvedMemberships = memberships.filter((membership) => membership.status === 'approved');
   const selectorMemberships = approvedMemberships.length ? memberships : [];
@@ -131,19 +136,42 @@ export function GroupScreen({
 
       <GroupStatus activeGroup={activeGroup} approved={approved} setNotice={setNotice} />
 
-      <Section title="Gå med i grupp">
-        <TextInput autoCapitalize="none" placeholder="Gruppkod, t.ex. vild-snäll-murkla" style={styles.input} value={joinCode} onChangeText={setJoinCode} />
-        <Pressable style={[styles.secondaryButton, busy && styles.disabled]} disabled={busy} onPress={handleJoinGroup}>
+      <View onLayout={(event) => { joinGroupY.current = event.nativeEvent.layout.y; }}>
+        <Section title="Gå med i grupp" titleStyle={styles.groupFormTitle}>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="visible-password"
+          onFocus={() => onScrollToJoinGroup(joinGroupY.current)}
+          onSubmitEditing={handleJoinGroup}
+          placeholder="Gruppkod, t.ex. vild-snäll-murkla"
+          returnKeyType="done"
+          style={styles.input}
+          value={joinCode}
+          onChangeText={setJoinCode}
+        />
+        <Pressable style={[styles.secondaryButton, styles.groupFormButton, busy && styles.disabled]} disabled={busy} onPress={handleJoinGroup}>
           <Text style={styles.secondaryButtonText}>Ansök</Text>
         </Pressable>
-      </Section>
+        </Section>
+      </View>
 
-      <Section title="Skapa grupp">
-        <TextInput placeholder="Gruppnamn" style={styles.input} value={groupName} onChangeText={setGroupName} />
-        <Pressable style={[styles.primaryButton, busy && styles.disabled]} disabled={busy} onPress={handleCreateGroup}>
+      <Section title="Skapa grupp" titleStyle={styles.groupFormTitle}>
+        <TextInput
+          autoCorrect={false}
+          onFocus={onScrollToCreateGroup}
+          onSubmitEditing={handleCreateGroup}
+          placeholder="Gruppnamn"
+          returnKeyType="done"
+          style={styles.input}
+          value={groupName}
+          onChangeText={setGroupName}
+        />
+        <Pressable style={[styles.primaryButton, styles.groupFormButton, busy && styles.disabled]} disabled={busy} onPress={handleCreateGroup}>
           <Text style={styles.primaryButtonText}>Skapa grupp</Text>
         </Pressable>
         <Text style={styles.muted}>Grupper raderas automatiskt efter 7 dagar. Max 30 personer per grupp.</Text>
+        <View style={styles.groupFormBottomSpacer} />
       </Section>
     </View>
   );

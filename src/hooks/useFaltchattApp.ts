@@ -3,7 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import MapView, { MapType } from 'react-native-maps';
 
 import {
@@ -569,9 +569,12 @@ export function useFaltchattApp(): { state: FaltchattState; actions: FaltchattAc
         setNoticeState('Platsbehörighet saknas. Aktivera position i telefonens appinställningar och slå på delning igen.');
         return;
       }
+      if (Platform.OS === 'android') {
+        await Location.enableNetworkProviderAsync().catch((error) => console.warn('Kunde inte aktivera hög precision via Android.', error));
+      }
       locationSubscription.current?.remove();
       locationSubscription.current = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 5 },
+        { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 5 },
         async (position) => {
           if (!locationSharingRef.current) return;
           const { latitude, longitude, accuracy, heading, speed } = position.coords;

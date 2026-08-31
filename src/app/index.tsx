@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated, Keyboard, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorMessage } from '@/components/common/ErrorMessage';
@@ -20,11 +20,20 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { sendLocationMessage } from '@/services/chatService';
 import { styles } from '@/styles/faltchattStyles';
 
+const MAP_EXPANDED_HEIGHT = 285;
+
 export default function FaltchattApp() {
   const { state, actions } = useFaltchattApp();
   const contentRef = useRef<ScrollView>(null);
+  const mapHeight = useRef(new Animated.Value(MAP_EXPANDED_HEIGHT)).current;
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const hideMapForChatKeyboard = state.view === 'chat' && keyboardVisible;
+  const [mapInputFocused, setMapInputFocused] = useState(false);
+  const hideMapForKeyboard = keyboardVisible && !mapInputFocused;
+
+  function scrollContentTo(y: number) {
+    requestAnimationFrame(() => contentRef.current?.scrollTo({ y, animated: true }));
+    setTimeout(() => contentRef.current?.scrollTo({ y, animated: true }), 260);
+  }
 
   async function sendMapLocationMessage(text: string, latitude: number, longitude: number) {
     if (!state.activeGroup || !state.approved || !state.user) return;
@@ -39,6 +48,14 @@ export default function FaltchattApp() {
       actions.setBusy(false);
     }
   }
+
+  useEffect(() => {
+    Animated.timing(mapHeight, {
+      toValue: hideMapForKeyboard ? 0 : MAP_EXPANDED_HEIGHT,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+  }, [hideMapForKeyboard, mapHeight]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -75,8 +92,10 @@ export default function FaltchattApp() {
             onOpenProfile={() => actions.setView('profile')}
             setNotice={actions.setNotice}
           />
-          {hideMapForChatKeyboard ? null : (
-            <View style={styles.mapWithNotice}>
+          <Animated.View
+            pointerEvents={hideMapForKeyboard ? 'none' : 'auto'}
+            style={[styles.mapWithNotice, styles.mapAnimatedClip, { height: mapHeight }]}
+          >
               <MapScreen
                 approved={state.approved}
                 locations={state.visibleLocations}
@@ -86,6 +105,7 @@ export default function FaltchattApp() {
                 mapType={state.mapType}
                 membersByUser={state.membersByUser}
                 mapTarget={state.mapTarget}
+                onInputFocusChange={setMapInputFocused}
                 onSendLocationMessage={sendMapLocationMessage}
                 ownLocation={state.ownLocation}
                 profile={state.profile}
@@ -98,8 +118,7 @@ export default function FaltchattApp() {
                   {state.groupNotice ? <StatusBanner text={state.groupNotice} tone="success" onClose={actions.clearGroupNotice} /> : null}
                 </View>
               ) : null}
-            </View>
-          )}
+          </Animated.View>
           <TabBar
             unreadChat={state.unreadChat}
             unreadGroup={state.unreadGroup}
@@ -112,7 +131,6 @@ export default function FaltchattApp() {
               approved={state.approved}
               answers={state.answers}
               busy={state.busy}
-              keyboardVisible={keyboardVisible}
               membersByUser={state.membersByUser}
               messages={state.messages}
               onRefresh={() => actions.refreshAll(state.activeGroupId)}
@@ -123,7 +141,11 @@ export default function FaltchattApp() {
               userId={state.user.id}
             />
           ) : (
-            <ScrollView ref={contentRef} style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              ref={contentRef}
+              style={styles.content}
+              contentContainerStyle={[styles.contentInner, keyboardVisible && styles.contentInnerKeyboard]}
+              keyboardShouldPersistTaps="handled">
               {state.view === 'group' ? (
                 <GroupScreen
                   activeGroup={state.activeGroup}
@@ -135,6 +157,8 @@ export default function FaltchattApp() {
                   members={state.members}
                   memberships={state.memberships}
                   onRefresh={() => actions.refreshAll(state.activeGroupId)}
+                  onScrollToCreateGroup={() => scrollContentTo(760)}
+                  onScrollToJoinGroup={(y) => scrollContentTo(y)}
                   onScrollToTop={() => contentRef.current?.scrollTo({ y: 0, animated: true })}
                   onSelectGroup={actions.selectGroup}
                   presence={state.presence}

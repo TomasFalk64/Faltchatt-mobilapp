@@ -43,6 +43,7 @@ export function MessageComposer({
       setText('');
       setOptions('');
       await onRefresh();
+      Keyboard.dismiss();
     } catch (error) {
       setNotice(friendlyError(error, 'Kunde inte skicka.'));
     } finally {

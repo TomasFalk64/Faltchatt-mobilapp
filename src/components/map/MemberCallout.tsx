@@ -30,7 +30,7 @@ export function MemberCallout({
         <FaltSymbol color={color} size={18} symbol={profile?.symbol} />
         <Text style={styles.calloutTitle}>{alias}</Text>
       </View>
-      <Text>Uppdaterades senast: {formatRelative(updatedAt)}</Text>
+      <Text>{formatRelative(updatedAt)}</Text>
       <Text>Noggrannhet ±{Math.round(accuracy || 0)} m</Text>
     </View>
   );

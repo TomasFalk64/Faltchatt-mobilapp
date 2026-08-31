@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, GestureResponderEvent, Keyboard, Pressable, Text, View } from 'react-native';
 
 import { PollMessage } from '@/components/chat/PollMessage';
 import { FaltSymbol } from '@/components/common/FaltSymbol';
@@ -9,7 +9,7 @@ import { styles } from '@/styles/faltchattStyles';
 
 export function MessageList({
   answers,
-  keyboardVisible,
+  bottomPadding,
   membersByUser,
   messages,
   onRefresh,
@@ -19,7 +19,7 @@ export function MessageList({
   userId,
 }: {
   answers: QuestionAnswer[];
-  keyboardVisible: boolean;
+  bottomPadding: number;
   membersByUser: Map<string, Member>;
   messages: Message[];
   onRefresh: () => Promise<void>;
@@ -29,22 +29,46 @@ export function MessageList({
   userId: string;
 }) {
   const listRef = useRef<FlatList<Message>>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [metaMessageId, setMetaMessageId] = useState<string | null>(null);
+  const safeBottomPadding = Math.max(bottomPadding, 74);
+  const displayedMessages = useMemo(() => messages.slice().reverse(), [messages]);
+  const metaMessage = metaMessageId ? messages.find((message) => message.id === metaMessageId) ?? null : null;
+  const metaMember = metaMessage ? membersByUser.get(metaMessage.user_id) : undefined;
+  const metaText = metaMessage ? `${metaMember?.profiles?.alias ?? 'Okänd'} ${formatClock(metaMessage.created_at)}` : null;
+  const metaWidth = metaText ? metaPopupWidth(metaText) : 0;
 
   useEffect(() => {
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-  }, [keyboardVisible, messages.length]);
+    requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
+    const timeout = setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), 120);
+
+    return () => clearTimeout(timeout);
+  }, [messages.length]);
 
   function toggleMeta(messageId: string) {
     setMetaMessageId((value) => (value === messageId ? null : messageId));
   }
 
+  function handleTouchStart(event: GestureResponderEvent) {
+    const { pageX, pageY } = event.nativeEvent;
+    touchStart.current = { x: pageX, y: pageY };
+  }
+
+  function handleTouchEnd(event: GestureResponderEvent) {
+    if (!touchStart.current) return;
+    const { pageX, pageY } = event.nativeEvent;
+    const movedX = Math.abs(pageX - touchStart.current.x);
+    const movedY = Math.abs(pageY - touchStart.current.y);
+    touchStart.current = null;
+
+    if (movedX < 8 && movedY < 8) {
+      Keyboard.dismiss();
+    }
+  }
+
   function renderMessage({ item: message }: { item: Message }) {
     const member = membersByUser.get(message.user_id);
     const own = message.user_id === userId;
-    const metaVisible = metaMessageId === message.id;
-    const metaText = `${member?.profiles?.alias ?? 'Okänd'} ${formatClock(message.created_at)}`;
-    const metaWidth = metaPopupWidth(metaText);
 
     if (message.type === 'question') {
       return (
@@ -52,9 +76,6 @@ export function MessageList({
           answers={answers}
           membersByUser={membersByUser}
           message={message}
-          metaText={metaText}
-          metaWidth={metaWidth}
-          metaVisible={metaVisible}
           onRefresh={onRefresh}
           onToggleMeta={() => toggleMeta(message.id)}
           question={questions.get(message.id)}
@@ -73,11 +94,6 @@ export function MessageList({
             <Pressable hitSlop={8} style={styles.chatMessageSymbol} onPress={() => toggleMeta(message.id)}>
               <FaltSymbol color={member?.profiles?.symbol_color} size={chatSymbolSize(member?.profiles?.symbol)} symbol={member?.profiles?.symbol} />
             </Pressable>
-            {metaVisible ? (
-              <Pressable style={[styles.chatMetaPopup, { width: metaWidth }]} onPress={() => setMetaMessageId(null)}>
-                <Text style={styles.chatMetaPopupText} numberOfLines={1}>{metaText}</Text>
-              </Pressable>
-            ) : null}
           </View>
           <Text style={styles.messageText}>{text}</Text>
         </View>
@@ -91,18 +107,31 @@ export function MessageList({
   }
 
   return (
-    <FlatList
-      ref={listRef}
-      data={messages}
-      keyExtractor={(message) => message.id}
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      renderItem={renderMessage}
-      style={styles.chatList}
-      contentContainerStyle={styles.chatListContent}
-      onContentSizeChange={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }))}
-      onLayout={() => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }))}
-    />
+    <View style={styles.chatListWrap}>
+      <FlatList
+        ref={listRef}
+        data={displayedMessages}
+        inverted
+        keyExtractor={(message) => message.id}
+        keyboardDismissMode="none"
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={<View style={{ height: safeBottomPadding + 12 }} />}
+        renderItem={renderMessage}
+        style={styles.chatList}
+        contentContainerStyle={styles.chatListContent}
+        onTouchEnd={handleTouchEnd}
+        onTouchStart={handleTouchStart}
+        onLayout={() => {
+          requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }));
+          setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 120);
+        }}
+      />
+      {metaText ? (
+        <Pressable style={[styles.chatMetaOverlay, { width: metaWidth }]} onPress={() => setMetaMessageId(null)}>
+          <Text style={styles.chatMetaPopupText} numberOfLines={1}>{metaText}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 

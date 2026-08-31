@@ -2,9 +2,30 @@ import { Pressable, Text, View } from 'react-native';
 
 import { styles } from '@/styles/faltchattStyles';
 
-export function SegmentButton({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+export function SegmentButton({
+  active,
+  first,
+  label,
+  last,
+  onPress,
+}: {
+  active: boolean;
+  first?: boolean;
+  label: string;
+  last?: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
+    <Pressable
+      style={[
+        styles.segmentButton,
+        first && styles.segmentButtonFirst,
+        last && styles.segmentButtonLast,
+        !first && styles.segmentButtonJoined,
+        active && styles.segmentButtonActive,
+      ]}
+      onPress={onPress}
+    >
       <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
     </Pressable>
   );
